@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PRD Validation: usebugreport</title>
+<style>
+  :root {
+    --bg: #fafaf9; --surface: #ffffff; --border: #e7e5e4; --text: #1c1917; --muted: #78716c;
+    --verdict-strong: #16a34a; --verdict-adequate: #65a30d; --verdict-thin: #d97706; --verdict-broken: #dc2626;
+    --sev-low: #64748b; --sev-medium: #ca8a04; --sev-high: #ea580c; --sev-critical: #dc2626;
+    --grade-good: #65a30d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px; margin: 0; }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+  header.report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, Menlo, monospace; }
+  .grade { padding: 10px 18px; border-radius: 8px; font-weight: 600; color: white; background: var(--grade-good); }
+  .synthesis { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--muted); border-radius: 8px; padding: 18px 22px; margin-bottom: 24px; }
+  .dimension-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .dim-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+  section.dimension details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; }
+  section summary { padding: 14px 20px; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 12px; }
+  section summary::-webkit-details-marker { display: none; }
+  .verdict-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; text-transform: uppercase; color: white; }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .dim-body { padding: 4px 20px 18px; font-size: 14.5px; }
+  .findings-list { padding: 0 20px 4px; }
+  article.finding { padding: 14px 0; border-top: 1px solid var(--border); }
+  .badge { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; }
+  article.finding header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .finding-location { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .mechanical { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-top: 24px; font-size: 14px; }
+  footer.report-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="report-header">
+    <div class="title">
+      <h1>usebugreport — Validation Report</h1>
+      <div class="subtitle">_bmad-output/planning-artifacts/prds/prd-usebugreport-2026-07-20/prd.md</div>
+    </div>
+    <div class="grade">Good — PASS_WITH_FIXES_APPLIED</div>
+  </header>
+
+  <div class="synthesis">
+    <p>The PRD is decision-ready for architecture and epics: council settlements are encoded, launch gates (LG-1–LG-11) and fast-follow (FF-1–FF-5) are explicit, and FRs carry testable consequences.</p>
+    <p>Four HIGH internal-consistency findings were fixed in prd.md during this run. No council violations remain.</p>
+  </div>
+
+  <div class="dimension-summary">
+    <div class="dim-card"><div class="dim-name">Decision-readiness</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Substance over theater</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Strategic coherence</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Done-ness clarity</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Scope honesty</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Downstream usability</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+  </div>
+
+  <section class="dimension">
+    <details open>
+      <summary><h2>High findings (fixed)</h2><span class="verdict-pill verdict-adequate">4 fixed</span></summary>
+      <div class="findings-list">
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">FR-21 SM cross-reference</h3><span class="finding-location">§4.7 FR-21</span></header>
+          <div>Cited SM-5 instead of SM-4. Fixed in prd.md.</div>
+        </article>
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Assignee scope drift</h3><span class="finding-location">FR-11, UJ-2, FF-5</span></header>
+          <div>Bulk assign deferred to v1.1; journey and OQ-1 aligned.</div>
+        </article>
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">create_comment REST parity</h3><span class="finding-location">§4.5 FR-16</span></header>
+          <div>REST POST endpoint added with shared service layer.</div>
+        </article>
+        <article class="finding">
+          <header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Webhook event phasing</h3><span class="finding-location">§4.6 FR-19</span></header>
+          <div>comment.created deferred to v1.1 (FF-4).</div>
+        </article>
+      </div>
+    </details>
+  </section>
+
+  <div class="mechanical">
+    <h3>Mechanical notes</h3>
+    <ul>
+      <li>All 10 council settlements: PASS</li>
+      <li>4 MEDIUM + 1 LOW recommendations in validation-report.md</li>
+      <li>review-rubric.md is the detailed rubric walk</li>
+    </ul>
+  </div>
+
+  <footer class="report-footer">
+    <span>Rubric: .agents/skills/bmad-prd/assets/prd-validation-checklist.md</span>
+    <span>Generated: 2026-07-20T06:00:00+07:00</span>
+  </footer>
+</div>
+</body>
+</html>
