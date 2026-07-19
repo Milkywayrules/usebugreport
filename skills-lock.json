@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "verasic-bugbot": {
+      "source": "milkywayrules/verasic-skills",
+      "sourceType": "github",
+      "skillPath": "skills/verasic-bugbot/SKILL.md",
+      "computedHash": "cfb1e1efebd84b884e0e2e44984350fe607c8d8f9cf51fae617b34c3cc440407"
+    },
+    "verasic-git-commits": {
+      "source": "milkywayrules/verasic-skills",
+      "sourceType": "github",
+      "skillPath": "skills/verasic-git-commits/SKILL.md",
+      "computedHash": "80d04906d1ab8cf87c2b246ac73a1662dcfe6466b00901e1d3a6ab3f47cbbb3d"
+    }
+  }
+}

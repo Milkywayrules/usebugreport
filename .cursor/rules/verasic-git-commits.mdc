@@ -1,0 +1,41 @@
+---
+description: verasic-git-commits — message style (comment/JSDoc casing), no co-authored/AI trailers; verify after every commit
+alwaysApply: true
+---
+
+# verasic-git-commits
+
+Hard convention for **every commit** (any branch, any agent, any IDE). The
+full spec and recipes live in `.cursor/skills/verasic-git-commits/references/`
+— read `commit-protocol.md` before your first commit of a session. If that
+folder is missing, the installation is broken: say so and fall back to the
+digest below.
+
+## Non-negotiables (digest)
+
+- subject: `type: summary` or `type(scope): summary` — types: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `style`, `perf`, `build`, `ci`, `revert`; **lowercase** summary start, imperative mood, no trailing period
+- body (optional; blank line after subject): lowercase first sentence; explain **why**, not a file list; multiple items = `- ` list, one item per line
+- casing: lowercase first sentence, natural casing for proper nouns/acronyms/components (`User ID`, `PROJ-1234`, `TabOverview`); backtick technical literals (`--set`, `git commit`, `src/foo.ts`, `TAG_NAME`)
+- never: `Co-authored-by:` trailers in **any casing**, `Generated with ...` lines, decorative emoji in subject
+- never: AI-session language — tool/model names, agent/orchestration vocabulary, plan-step references, chat narration, assistant voice (`I added`, `let me`, `this commit`); write as a teammate explaining why — full pattern tables + allowlist in `references/conventions.md`
+- never: `--no-verify` / `-n` on `git commit` — hooks are the enforcement floor, not an obstacle; if a hook rejects the message, fix the message
+- multi-line messages: HEREDOC so casing stays intentional
+
+## After every commit — verify
+
+```bash
+git log -1 --format=%B | grep -qiE '^co-authored-by:' && echo 'TRAILER PRESENT' || echo 'clean'
+```
+
+- **clean** → done
+- **TRAILER PRESENT** + not pushed → use the `git commit-tree` escape hatch in `references/commit-protocol.md`; **do not** loop on `--amend` (the wrapper re-injects)
+- already pushed → no force-push; report and fix on a follow-up with approval
+
+Repos with the verasic `commit-msg` hook wired (lefthook or `core.hooksPath`)
+strip trailers automatically and reject mechanical style violations — verify
+stays as the cheap proof.
+
+## Pre-push audit
+
+Run `/verasic-audit-commits` before the first push of a branch or opening a PR
+— audit-only by default.

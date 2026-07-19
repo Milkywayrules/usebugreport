@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# verasic-git-commits — deterministic commit-msg hook (layer 0 of the convention).
+#
+# strips co-authored/AI attribution lines and rejects mechanical style
+# violations before the commit object is written. judgment calls (AI voice,
+# why-not-what bodies) stay with the rule digest and the pre-push audit.
+#
+# wiring (pick one):
+#   lefthook.yml:
+#     commit-msg:
+#       commands:
+#         verasic:
+#           run: bash .cursor/skills/verasic-git-commits/hooks/commit-msg {1}
+#   raw git (repo without a hook manager):
+#     git config core.hooksPath .cursor/skills/verasic-git-commits/hooks
+set -u
+
+MSG_FILE="${1:?usage: commit-msg <message-file>}"
+
+# --- auto-strip attribution lines (near-zero false-positive forms only) ---
+# line-anchored trailer/link forms; prose like "generated with openapi codegen"
+# is untouched because it lacks the trailer colon / markdown-link bracket.
+strip_pattern='^co-authored-by:|^generated-with:|^generated with \[|^🤖|^(signed-off-by|reviewed-by):.*(\bai\b|claude|copilot|cursor|chatgpt|gemini|\bgpt\b)'
+if grep -qiE "$strip_pattern" "$MSG_FILE"; then
+  tmp="$(mktemp)"
+  grep -viE "$strip_pattern" "$MSG_FILE" > "$tmp" || true
+  cat "$tmp" > "$MSG_FILE"
+  rm -f "$tmp"
+  echo "verasic-git-commits: stripped attribution line(s) (co-authored / generated-with)" >&2
+fi
+
+# --- checks run on the comment-free message ---
+clean="$(grep -v '^#' "$MSG_FILE" || true)"
+subject="$(printf '%s\n' "$clean" | head -n1)"
+
+# git-generated messages pass through untouched
+case "$subject" in
+  Merge\ *|Revert\ *|fixup!*|squash!*|amend!*|'') exit 0 ;;
+esac
+
+failed=0
+fail() {
+  [ "$failed" -eq 0 ] && echo "verasic-git-commits: commit message rejected — subject: '$subject'" >&2
+  echo "  x $1" >&2
+  failed=1
+}
+
+# conventional prefix
+if ! printf '%s' "$subject" | grep -qE '^(feat|fix|chore|refactor|docs|test|style|perf|build|ci|revert)(\([^)]*\))?!?: .'; then
+  fail "subject must be 'type: summary' or 'type(scope): summary' — types: feat fix chore refactor docs test style perf build ci revert"
+else
+  # lowercase summary start; CamelCase / acronym first tokens (TabOverview, API) stay natural
+  first_word="$(printf '%s' "$subject" | sed -E 's/^[a-z]+(\([^)]*\))?!?: *//' | cut -d' ' -f1)"
+  if printf '%s' "$first_word" | grep -qE '^[A-Z][a-z]*$'; then
+    fail "summary starts uppercase ('$first_word') — lowercase it; proper nouns like TabOverview / API stay natural"
+  fi
+fi
+
+# no trailing period on the subject
+if printf '%s' "$subject" | grep -qE '\.[[:space:]]*$'; then
+  fail "no trailing period on the subject"
+fi
+
+# no decorative emoji in subject (needs grep -P; silently skipped on BSD grep)
+if printf '%s' "$subject" | grep -qP '[\x{1F300}-\x{1FAFF}]|[\x{2600}-\x{27BF}]|\x{FE0F}' 2>/dev/null; then
+  fail "no decorative emoji in the subject"
+fi
+
+# blank line between subject and body
+second_line="$(printf '%s\n' "$clean" | sed -n '2p')"
+if [ -n "$second_line" ]; then
+  fail "blank line required between subject and body"
+fi
+
+# warn-only: quick AI-language smell — judgment stays with the pre-push audit
+if printf '%s\n' "$clean" | grep -qiE "files changed:|as requested|per user|i've updated|\bi added\b|let me |this ensures that"; then
+  echo "verasic-git-commits: warning — possible AI-session language; reword to teammate voice (spec: references/conventions.md)" >&2
+fi
+
+if [ "$failed" -eq 1 ]; then
+  echo "  spec: .cursor/skills/verasic-git-commits/references/conventions.md" >&2
+  exit 1
+fi
+exit 0
