@@ -1,0 +1,28 @@
+{
+  "name": "@usebugreport/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "echo 'no tests'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check .",
+    "db:generate": "echo 'drizzle generate — E2-S1'",
+    "db:migrate": "echo 'drizzle migrate — E2-S1'"
+  },
+  "dependencies": {
+    "@usebugreport/config": "workspace:*",
+    "drizzle-orm": "^0.38.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

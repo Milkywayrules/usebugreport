@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: 2026-07-20 06:31
+# last_updated: 2026-07-20 06:45
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 06:31"
+last_updated: "2026-07-20 06:45"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -50,8 +50,8 @@ story_location: "/home/dio--ubuntu/dio/_koding/project/verasic-lab/usebugreport/
 
 development_status:
   # === LAUNCH SCOPE (E1-E9, 48 stories) — dependency execution order ===
-  epic-1: backlog  # E1 (launch)
-  1-1-monorepo-scaffold-and-capture-packages: backlog
+  epic-1: in-progress  # E1 (launch)
+  1-1-monorepo-scaffold-and-capture-packages: done
   epic-4: backlog  # E4 (launch)
   4-1-better-auth-github-oauth-and-session: backlog
   epic-2: backlog  # E2 (launch)

@@ -1,0 +1,2 @@
+/** Drizzle schema placeholder — migrations in E2-S1. */
+export const schemaPlaceholder = true;

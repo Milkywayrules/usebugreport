@@ -4,3 +4,14 @@
 _bmad/config.user.yaml
 __pycache__/
 *.pyc
+
+# Node / monorepo
+node_modules/
+dist/
+.next/
+.turbo/
+.env
+.env.*
+!.env.example
+
+*.tsbuildinfo

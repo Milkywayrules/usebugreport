@@ -1,0 +1,6 @@
+# usebugreport/api — stub (full multi-stage build in ops epic)
+# Container: api — port 3001
+FROM oven/bun:1.2-alpine
+WORKDIR /app
+# COPY dist/ and run — wired in deploy story
+CMD ["echo", "api stub"]

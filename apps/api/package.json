@@ -1,0 +1,21 @@
+{
+  "name": "@usebugreport/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "bun --watch src/index.ts",
+    "test": "echo 'no tests'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@usebugreport/config": "workspace:*",
+    "@usebugreport/services": "workspace:*",
+    "elysia": "^1.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

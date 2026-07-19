@@ -1,0 +1,34 @@
+# Production compose stub — Coolify wiring deferred to ops epic.
+# Topology: architecture §1 (web :3000, api :3001, worker, postgres:16, redis:7-alpine)
+
+services:
+  web:
+    image: usebugreport/web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  api:
+    image: usebugreport/api
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    image: usebugreport/worker
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

@@ -1,0 +1,5 @@
+# usebugreport/web — stub (full multi-stage build in ops epic)
+# Container: web — port 3000
+FROM oven/bun:1.2-alpine
+WORKDIR /app
+CMD ["echo", "web stub"]

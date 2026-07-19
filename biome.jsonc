@@ -1,0 +1,48 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.4/schema.json",
+  "extends": ["ultracite/biome/core"],
+  "files": {
+    "includes": [
+      "!!_bmad-output",
+      "!!_bmad",
+      "!!.agents",
+      "!!.cursor",
+      "!!design-artifacts",
+      "!!docs",
+      "!!knowledge-base-of-king-the-user",
+      "!node_modules",
+      "!dist",
+      "!.next",
+      "!.turbo"
+    ]
+  },
+  "overrides": [
+    {
+      "includes": ["apps/web/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@radix-ui/*": "Use Mantine — no Radix in v1 (architecture §10)."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/**"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
+    }
+  ]
+}
