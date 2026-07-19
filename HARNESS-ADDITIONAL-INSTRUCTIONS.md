@@ -1,4 +1,4 @@
-1. never use radix-ui. use base-ui. if any implemented, refactor then QA.
+1. never use radix-ui. use base-ui. if any implemented, refactor then QA. if not using radix / base, skip this line.
 
 2. add pricing tier. i propose 4 tier with 1 tier is the base for trying out.
 
