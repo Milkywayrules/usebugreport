@@ -189,4 +189,4 @@ So that API/MCP cannot bypass UI gates (AD-11 board mandate).
 
 **Technical notes:** Called from `IntegrationService.connect*`, `WebhookService.register`, ingest path (E2-S6), workspace create (E4-S3). Epic acceptance criterion: **not UI-only**.
 
-**Dependencies:** E4-S3, E2-S1 (`workspace_usage_monthly`).
+**Dependencies:** E4-S1, E2-S1 (`workspace_usage_monthly`).

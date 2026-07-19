@@ -43,7 +43,7 @@ So that I can navigate reports, projects, and settings (FR-8 UI, LG-3).
 
 As a new user with no workspace,
 I want a stepper to create my first workspace and project,
-So that I satisfy the membership gate and get an SDK snippet (FR-8, UJ-5).
+So that I satisfy the membership gate and get an SDK snippet (FR-8, EXPERIENCE.md Flow 5).
 
 **Acceptance Criteria:**
 
@@ -295,4 +295,4 @@ So that keyboard behavior never drifts (AD-10).
 
 **Technical notes:** `@mantine/hooks` `useHotkeys`. Link palette footer hints to SM-3 discoverability (EXPERIENCE.md).
 
-**Dependencies:** E3-S4, E3-S9.
+**Dependencies:** E3-S4.

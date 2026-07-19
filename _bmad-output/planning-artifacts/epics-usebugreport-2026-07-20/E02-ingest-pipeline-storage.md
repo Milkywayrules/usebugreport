@@ -127,6 +127,7 @@ So that the replay viewer loads blobs client-side without API proxy (FR-5, FR-6,
 **Given** authenticated context with project access
 **When** `ReportService.getById`, `getSummary`, `getConsoleLogs`, `getNetworkRequests` are called
 **Then** every query includes `organization_id` from `AuthContext` (AD-3)
+**And** `getConsoleLogs` / `getNetworkRequests` fetch `console.json.gz` / `network.json.gz` from R2 server-side, decompress, filter, and return JSON — replay bytes are not proxied (AD-6 applies to replay only; architecture council note)
 **And** `getReplayManifest(reportId)` returns presigned GET URLs (TTL 15 min) for `report_blobs.r2_key` rows
 **And** presigned URLs are never returned via MCP tools or surface registry (AD-6)
 
