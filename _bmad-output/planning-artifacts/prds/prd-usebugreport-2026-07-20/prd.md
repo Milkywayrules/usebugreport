@@ -260,6 +260,17 @@ Users with multiple **Workspace** memberships switch active **Workspace** in ≤
 - ⌘+1..9 switches to pinned **Workspaces**; ⌘K "Switch workspace" lists all.
 - All queries and API keys scoped to active **Workspace** unless key specifies org explicitly.
 
+#### FR-26: Report comments in web app
+
+Authenticated project members with **reporter** role or above can view and create comments on a **Report** from the web app.
+
+**Consequences (testable):**
+- Comments tab on report detail shows thread ordered chronologically with author display name and timestamp.
+- Composer (textarea + submit) creates comments via session auth; empty submit disabled; optimistic append with revert on failure.
+- **Viewer** role sees thread read-only (no composer).
+- Agent-created comments (FR-16, post-FF-1) render in the same thread attributed to API key name.
+- Comment bodies stored in Postgres; included in **Workspace** deletion cascade (FR-10).
+
 **Feature-specific NFRs:**
 - First contentful paint on report list < 2s p95 on broadband.
 - WCAG 2.1 AA for core triage flows (keyboard operable by default).
@@ -301,12 +312,12 @@ MCP exposes read tools mirroring REST:
 
 #### FR-16: Agent create_comment — MCP + REST (first-to-slip, not launch gate)
 
-MCP exposes `create_comment`; REST exposes `POST /api/v1/reports/:id/comments` — both invoke the same **Shared Service Layer** method.
+MCP exposes `create_comment`; REST exposes `POST /api/v1/reports/:id/comments` — both invoke the same **Shared Service Layer** method as human web comments (FR-26), scoped to **Workspace API Key** auth.
 
 **Consequences (testable):**
-- Ships within 2 weeks post-launch OR blocks v1.1 release — not a v1.0 launch gate.
+- Ships within 2 weeks post-launch OR blocks v1.1 release — not a v1.0 launch gate. Human web comment creation (FR-26) ships at v1.0 launch.
 - MCP tool and REST endpoint return field-equivalent comment payloads (modulo transport envelope).
-- Creates comment thread entry attributed to API key name; visible in web app.
+- Creates comment thread entry attributed to API key name; visible in web app alongside human comments.
 - Idempotent via optional client-supplied dedupe key.
 
 ---
@@ -459,7 +470,7 @@ All items below **must** ship before public v1.0 launch:
 | # | Launch Gate | FRs |
 |---|-------------|-----|
 | LG-1 | `@usebugreport/browser` SDK ingest (Instant Replay, console, network, screenshot, metadata) | FR-1–FR-4 |
-| LG-2 | Replay viewer + report detail in web app | FR-5, FR-6 |
+| LG-2 | Replay viewer + report detail + comments in web app | FR-5, FR-6, FR-26 |
 | LG-3 | **Workspace** / **Project** CRUD + project RBAC | FR-8, FR-9 |
 | LG-4 | Linear outbound push (create issue) | FR-20, FR-21 |
 | LG-5 | MCP read suite including `search_reports` | FR-14, FR-15 |
@@ -488,7 +499,8 @@ All items below **must** ship before public v1.0 launch:
 | v1 integrations | Linear + GitHub fast-follow | **Linear outbound only** at launch; GitHub **v1.1 committed** |
 | `search_reports` | Implied in MCP suite | **Explicit v1 launch gate** (Postgres FTS) |
 | Recording links | v1.5 in brief | **v2.0** with Chrome extension; abuse/consent spike prerequisite |
-| `create_comment` | Optional v1 | In v1 scope but **not launch gate**; slip ≤2 weeks blocks v1.1 |
+| Human report comments | Brief pillar-4 "report detail + comments" | **Launch gate** (FR-26 web app composer) |
+| Agent `create_comment` | Optional v1 | **Not launch gate** (FR-16 MCP+REST); slip ≤2 weeks blocks v1.1 |
 | `summarize_workspace` | Persona copy references | **Deferred backlog** — out of v1 |
 | Pro unlimited reports | Marketing "unlimited" | **Fair-use soft cap** 2,000/mo with aligned marketing copy (§9) |
 | Agent API metric | ≥1 call per report | Counts **READ tools** at launch |
@@ -625,7 +637,7 @@ Epics derive from feature groups; each epic inherits launch gate vs fast-follow 
 |------|-------|------|
 | E1 Capture SDK | FR-1–FR-4 | Launch |
 | E2 Ingest Pipeline & Storage | FR-4, FR-5, FR-7 | Launch |
-| E3 Web App Core | FR-6, FR-8, FR-11–FR-13 | Launch |
+| E3 Web App Core | FR-6, FR-8, FR-11–FR-13, FR-26 | Launch |
 | E4 Auth & RBAC | FR-8, FR-9, FR-22, FR-23 | Launch |
 | E5 MCP Server | FR-14, FR-15 | Launch |
 | E6 REST API | FR-17, FR-18 | Launch |
