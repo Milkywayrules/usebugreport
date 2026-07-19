@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "python3 /home/dio--ubuntu/dio/_koding/project/verasic-lab/usebugreport/.bmad-loop/bmad_loop_hook.py SessionStart",
+        "timeoutSec": 60
+      }
+    ],
+    "stop": [
+      {
+        "type": "command",
+        "command": "python3 /home/dio--ubuntu/dio/_koding/project/verasic-lab/usebugreport/.bmad-loop/bmad_loop_hook.py Stop",
+        "timeoutSec": 60
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "command": "python3 /home/dio--ubuntu/dio/_koding/project/verasic-lab/usebugreport/.bmad-loop/bmad_loop_hook.py SessionEnd",
+        "timeoutSec": 60
+      }
+    ]
+  }
+}

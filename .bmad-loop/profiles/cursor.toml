@@ -1,0 +1,24 @@
+# Cursor Agent CLI (cursor-agent), driven as a custom profile — bmad-loop 0.8.1
+# ships no built-in cursor profile. Cursor's .cursor/hooks.json format ("version": 1,
+# handler objects directly in the event list, seconds-based timeoutSec) matches the
+# copilot-settings-json dialect shape exactly, so that dialect is reused to write a
+# hooks file Cursor accepts. Skills live in .agents/skills/ (same tree as codex/gemini
+# and the BMAD Cursor IDE installer). Slash-command expansion on the initial prompt is
+# unverified, so the profile loads SKILL.md explicitly (copilot pattern). Token usage
+# is not exposed by cursor-agent yet — usage_parser = "none" and the orchestrator
+# falls back to window-death detection.
+name = "cursor"
+binary = "cursor-agent"
+prompt_template = "LOAD the FULL .agents/skills/{skill}/SKILL.md, read its entire contents and follow its directions exactly, using subagents as needed: {args}"
+bypass_args = ["-f"]
+model_flag = "--model"
+usage_parser = "none"
+# stop fires per response turn in interactive mode; allow multi-turn dev/review passes.
+stop_without_result_nudges = 5
+first_run_note = "run `cursor-agent login` if needed; run `cursor-agent` once in the project and accept workspace trust + hook approval (hooks in .cursor/hooks.json); use --model composer-2.5-fast for Composer 2.5 Fast"
+skill_tree = ".agents/skills"
+
+[hooks]
+dialect = "copilot-settings-json"
+config_path = ".cursor/hooks.json"
+events = { sessionStart = "SessionStart", stop = "Stop", sessionEnd = "SessionEnd" }
