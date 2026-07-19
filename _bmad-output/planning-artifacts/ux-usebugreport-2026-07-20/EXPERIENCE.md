@@ -19,7 +19,9 @@ sources:
 
 **UI system:** Mantine v7+ with CSS-variable theming (`createTheme`, dark default). Component inventory in `DESIGN.md`. Data layer: TanStack Query (server state), TanStack Table (dense report list). Auth: better-auth GitHub OAuth + organization plugin (`setActive` workspace). **No Radix UI.**
 
-**Tenancy model:** User → N **Workspaces** (organizations) → N **Projects** → **Reports**. Active workspace scopes all queries, settings, and API key context. Session persists active workspace in cookie/localStorage.
+**Tenancy model:** User → N **Workspaces** (organizations) → N **Projects** → **Reports**. Active workspace scopes all queries, settings, and API key context. Session persists active workspace in cookie/localStorage. Multi-tenancy via better-auth **Organization** plugin only — **no** better-auth Teams feature.
+
+**Mandatory workspace gate (FR-8):** A signed-in user with zero **Workspace** memberships is hard-redirected to `/onboarding` on every authenticated route (including `/settings/account` and `/settings/workspaces`) until they belong to at least one **Workspace** (create during onboarding or accept an invite). Only `/onboarding`, `/login`, `/auth/callback`, and OAuth flows are reachable without membership. Middleware issues HTTP 302 to `/onboarding`; no `/w/[slug]/*` shell renders.
 
 **RBAC (project-level):** viewer (read), reporter (read + SDK submit), developer (reporter + integrations + Linear push), admin (developer + delete + member mgmt). UI hides/disables actions user cannot perform — no "permission denied" pages for hidden nav items.
 
@@ -33,7 +35,7 @@ sources:
 |-------|------|----------|---------|
 | `/login` | Login | public | GitHub OAuth CTA |
 | `/auth/callback` | OAuth callback | public | better-auth handler redirect |
-| `/onboarding` | Onboarding | authenticated | First workspace + project + SDK snippet |
+| `/onboarding` | Onboarding | authenticated (zero memberships) | Mandatory gate: create first **Workspace** + project + SDK snippet; sole authenticated destination until membership exists |
 | `/w/[slug]` | Workspace root | member | Redirect → `/w/[slug]/reports` |
 | `/w/[slug]/reports` | Report list | viewer | Dense triage queue (default landing) |
 | `/w/[slug]/reports/[id]` | Report detail | viewer | Replay + panels + actions |
@@ -126,7 +128,7 @@ Behavioral. Visual specs in `DESIGN.md`.
 | **Ingest key display** | `Code` + rotate `ActionIcon` | Masked by default; reveal on click (audit log). Rotate confirms via `Modal`. |
 | **GDPR deletion** | Multi-step `Modal` | Step 1: type workspace slug. Step 2: retention summary + checklist. Step 3: confirmation email notice. Cannot undo. |
 | **Usage meter** | `Progress` + `Text` | Free: "23 / 30". Pro: "847 / 2,000" with fair-use label. ≥80%: `{colors.warning}` + banner on report list. At cap: banner + SDK 429 copy reference. |
-| **Onboarding wizard** | `Stepper` | Steps: (1) Create project (2) Copy SDK snippet (3) Verify first report (poll/list link). Skip allowed after step 1. |
+| **Onboarding wizard** | `Stepper` | Steps: (1) Create **Workspace** + first project (2) Copy SDK snippet (3) Verify first report (poll/list link). **Skip blocked until step 1 completes** — workspace must exist before "Skip to dashboard" or any `/w/[slug]/*` route. Skip allowed only after step 1 (matches post–step-1 skip rule). |
 
 ## State Patterns
 
@@ -413,9 +415,9 @@ Touch: no hover quick actions; long-press row → context `Menu` with status/pus
 
 **Protagonist:** New solo dev, first workspace.
 
-1. GitHub OAuth → `/onboarding` Stepper.
-2. Step 1: Project name "My App" → creates project + ingest key.
-3. Step 2: SDK snippet with `projectKey` pre-filled; `CopyButton`. Docs link for `@usebugreport/browser` init options.
+1. GitHub OAuth → middleware detects zero memberships → hard redirect to `/onboarding` (no other authenticated route accessible).
+2. Step 1: **Workspace** name + first project name "My App" → creates organization + project + ingest key; membership gate satisfied.
+3. Step 2: SDK snippet with `projectKey` pre-filled; `CopyButton`. Docs link for `@usebugreport/browser` init options. "Skip to dashboard" enabled only from here (after step 1).
 4. Step 3: "Waiting for first report…" — polls list every 5s; on first ingest → celebration-free redirect to report detail.
 5. **Climax:** First replay visible; inline tip: "Press ? for keyboard shortcuts."
 
@@ -436,8 +438,9 @@ Touch: no hover quick actions; long-press row → context `Menu` with status/pus
 |--------|------|
 | Layout | Centered `Stepper` max-width 640px |
 | Components | `Stepper`, `TextInput`, `Code`, `CopyButton`, `Button`, `Loader` |
-| Steps | Create project → Copy SDK → Wait for report |
-| Skip | "Skip to dashboard" after step 1 → report list |
+| Gate | Hard gate for users with zero **Workspace** memberships; blocks all other authenticated routes until step 1 completes |
+| Steps | Create **Workspace** + first project → Copy SDK → Wait for report |
+| Skip | "Skip to dashboard" **disabled until step 1 completes** (workspace exists); after step 1 → report list |
 
 ### `/w/[slug]/reports` — Report list
 
@@ -486,7 +489,7 @@ Touch: no hover quick actions; long-press row → context `Menu` with status/pus
 
 | Page | Key components |
 |------|----------------|
-| general | `TextInput` name, slug read-only, tier `Badge` |
+| general | `TextInput` name, slug read-only, tier `Badge` (v1 launch: Free or Pro only; Studio/Agency badges reserved — defined, not sellable at v1.0) |
 | members | `Table`, invite `Modal`, role `Select` |
 | projects | Project CRUD table |
 | api-keys | Key list, create `Modal` with scope `Checkbox` group |
@@ -542,7 +545,7 @@ Reference `DESIGN.md` tokens. Implementation checklist for dev stories:
 | [ASSUMPTION] | Comments tab visible at v1 with human composer (FR-26); agent-authored comments appear post-FF-1 in same thread |
 | [ASSUMPTION] | Cross-workspace "today queue" is sequential ⌘1–9 hops, not unified inbox |
 | [NOTE FOR UX] | Assignee column omitted entirely until FF-5 — no placeholder column |
-| [NOTE FOR UX] | Studio tier shown in billing UI as "coming soon" if not sold at launch (PRD §14 Q2) |
+| [NOTE FOR UX] | Studio and Agency tiers defined in PRD §9 but not sellable at v1.0 — show as "coming soon" in usage/billing UI; tier badges Free/Pro only at launch |
 
 ## Sources Reconciliation
 

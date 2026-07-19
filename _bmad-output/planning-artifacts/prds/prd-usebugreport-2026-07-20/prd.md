@@ -201,7 +201,9 @@ Owners and admins can create **Workspaces** and **Projects**, invite members, an
 
 **Consequences (testable):**
 - GitHub OAuth login via better-auth; session supports `setActive` organization.
-- Free tier limited to 1 **Workspace**; Pro up to 5; higher tiers per pricing table.
+- Multi-tenancy maps 1 user → N **Workspaces** via better-auth **Organization** plugin only — **no** better-auth Teams feature.
+- **Mandatory first workspace:** After sign-in, a user with zero **Workspace** memberships is hard-redirected to `/onboarding` on any authenticated route (including `/settings/*`) until they belong to at least one **Workspace** via create or accepted invite. Middleware returns HTTP 302 to `/onboarding`; no **Workspace**-scoped routes render without membership.
+- Free tier limited to 1 **Workspace**; Pro up to 5; higher tiers per pricing table (§9).
 - Each **Project** generates rotatable **Ingest Key**; revocation immediate.
 
 #### FR-9: Project-level RBAC
@@ -582,12 +584,14 @@ All items below **must** ship before public v1.0 launch:
 
 ## 9. Monetization
 
-| Plan | Price | Includes |
-|------|-------|----------|
-| **Free** | $0 | 1 **Workspace**, **30 Reports/mo** (hard cap), MCP read-only, 1 integration, 7-day replay retention |
-| **Pro** | $12/mo | Up to 5 **Workspaces**, **Reports included for normal product-team use** (fair-use soft cap 2,000/mo per **Workspace**), full MCP + REST, keyboard power features, 30-day replay retention, webhooks |
-| **Studio** | $29/mo | Unlimited **Workspaces**/members, bi-directional sync (when shipped), 90-day retention |
-| **Agency** | $79/mo | White-label, client portals, cross-**Workspace** analytics, SSO (future) |
+Four pricing tiers are defined below. **Free** is the try-out base tier. **Only Free and Pro are v1.0 launch tiers (sellable).** Studio and Agency are documented placeholders — **defined, not sellable at v1.0** — and add no launch scope. Self-serve billing/payment checkout is out of v1.0 scope; v1 enforces tier quotas and retention only.
+
+| Tier | Price | v1.0 availability | Reports/mo (per **Workspace**) | **Workspaces** | MCP / REST | Replay retention | Other limits |
+|------|-------|-------------------|-------------------------------|----------------|------------|------------------|--------------|
+| **Free** | $0 | **Launch tier (sellable)** | **30** (hard cap) | **1** | MCP read-only | **7 days** | 1 integration |
+| **Pro** | $12/mo | **Launch tier (sellable)** | **2,000** fair-use soft cap | up to **5** | Full MCP + REST | **30 days** | Webhooks, keyboard power features |
+| **Studio** | $29/mo | **Defined, not sellable at v1.0** | Fair-use high volume (TBD at GA) | Unlimited | Full MCP + REST | **90 days** (per FR-7) | Unlimited members; bi-directional sync when shipped |
+| **Agency** | $79/mo | **Defined, not sellable at v1.0** | Custom / high volume (TBD at GA) | Unlimited multi-client | Full MCP + REST | **90 days** (minimum at GA) | White-label, client portals, cross-**Workspace** queue (post-v1); SSO (future) |
 
 **Fair-use alignment:** Pro marketing copy states "Reports included for normal product-team use" — not "unlimited" without qualification. Fair-use cap triggers throttling (HTTP 429 on ingest), not data deletion. Sales contact path for sustained high volume.
 
@@ -652,7 +656,7 @@ Epics derive from feature groups; each epic inherits launch gate vs fast-follow 
 ## 14. Open Questions
 
 1. **Assignee model:** Deferred to v1.1 (FF-5). Recommend free-text assignee first; user-ID linking in a later fast-follow.
-2. **Studio tier GA:** Sell at launch or wait until bi-directional sync ships?
+2. **Studio tier GA:** Defined in §9; not sellable at v1.0 — GA when bi-directional sync ships. Agency tier likewise defined, not sellable at v1.0.
 3. **EU hosting region:** Single VPS location vs CF Workers edge for API — architecture doc decision.
 
 ---
