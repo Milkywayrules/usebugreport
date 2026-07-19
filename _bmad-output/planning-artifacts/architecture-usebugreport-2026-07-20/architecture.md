@@ -2,7 +2,7 @@
 title: usebugreport Platform Architecture
 status: final
 created: 2026-07-20
-updated: 2026-07-20
+updated: 2026-07-20T06:25
 version: v1.0
 companion: ARCHITECTURE-SPINE.md
 sources:
@@ -68,6 +68,22 @@ flowchart TB
 | `redis` | redis:7-alpine | 6379 | Queues + rate limits |
 
 Health checks: `GET /health` on api (DB + Redis ping); `GET /api/health` on web. Coolify restart policy `unless-stopped`.
+
+### Container resource budget (12 GB VPS)
+
+| Container | Memory limit | Memory reservation | Notes |
+| --- | --- | --- | --- |
+| `postgres` | 3 GB | 2 GB | Shared buffers tuned accordingly |
+| `redis` | 512 MB | 256 MB | AOF; maxmemory policy `allkeys-lru` |
+| `api` | 1.5 GB | 768 MB | Elysia + MCP; no heavy gzip |
+| `web` | 1 GB | 512 MB | Next.js SSR |
+| `worker` | 2 GB | 1 GB | BullMQ consumers; concurrency derived from RSS |
+| `caddy` | 128 MB | 64 MB | TLS termination |
+| **Headroom** | ~4 GB | — | OS page cache, spikes |
+
+**Worker concurrency:** `WORKER_CONCURRENCY` env (default 8). Startup RSS probe; halve concurrency if RSS > 70% of container limit.
+
+**Graceful shutdown:** `SIGTERM` → stop accepting jobs → `worker.close()` drains in-flight (120s timeout) → exit 0. Coolify `stop_grace_period: 130s` on worker.
 
 **Backup strategy:** Postgres `pg_dump` daily to R2 bucket `ubr-backups/` (7-day retention). R2 object versioning optional on replay bucket. Redis AOF enabled; queue loss acceptable on disaster (jobs re-enqueued from Postgres pending states where applicable).
 
@@ -302,17 +318,37 @@ Managed via better-auth `apiKey()` plugin metadata; app table mirrors for scopes
 | `report_count` | int | Incremented on ingest complete |
 | PK | (organization_id, year_month) | |
 
-#### `deletion_jobs`
+#### `deletion_tombstones` (outside tenant cascade)
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | text PK | |
-| `organization_id` | text FK | |
-| `status` | enum | `queued`, `revoking`, `r2_purge`, `postgres_purge`, `redis_purge`, `complete`, `failed` |
+| `organization_id` | text | **No FK** — survives org row deletion |
+| `organization_slug` | text | Snapshot at enqueue |
+| `owner_email` | text | Snapshot at enqueue |
+| `status` | enum | `queued`, `notifying`, `external_purge`, `audit_terminal`, `postgres_purge`, `complete`, `failed` |
+| `last_completed_step` | text nullable | Resume pointer for idempotent retry |
 | `requested_by_user_id` | text | |
 | `started_at` | timestamptz | |
 | `completed_at` | timestamptz nullable | |
 | `error` | text nullable | |
+| `audit_metadata` | jsonb | Terminal state written before Postgres purge |
+
+#### `integration_operations` (outbox for outbound tracker pushes)
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | text PK | |
+| `report_id` | text FK | |
+| `organization_id` | text FK | |
+| `action` | text | `linear.push`, future: `github.push` |
+| `status` | enum | `pending`, `succeeded`, `failed` |
+| `external_id` | text nullable | e.g. Linear issue ID |
+| `external_url` | text nullable | |
+| `error` | text nullable | |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+| UNIQUE | `(report_id, action)` | Race-safe dedupe |
 
 #### `audit_log`
 
@@ -347,7 +383,8 @@ erDiagram
   reports ||--o{ report_blobs : has
   reports ||--o{ report_comments : has
   webhook_endpoints ||--o{ webhook_deliveries : has
-  organizations ||--o| deletion_jobs : triggers
+  organizations ||--o| deletion_tombstones : triggers
+  reports ||--o| integration_operations : outbox
 ```
 
 ### 3.3 Postgres FTS (search_reports)
@@ -374,25 +411,37 @@ CREATE INDEX reports_org_status_created_idx ON reports (organization_id, status,
 
 ## 4. Ingest Pipeline
 
+**Invariant:** BullMQ payloads contain references only — `{ reportId, r2Keys[], projectId, idempotencyKey }`. Never blob bytes.
+
 ```mermaid
 sequenceDiagram
   participant SDK as @usebugreport/browser
-  participant API as Elysia /capture/ingest
+  participant API as Elysia /capture/*
   participant Redis as Redis/BullMQ
-  participant Worker as ingest.process worker
+  participant Worker as ingest.finalize worker
   participant R2 as Cloudflare R2
   participant PG as PostgreSQL
 
-  SDK->>SDK: rrweb buffer 120s + console/network
-  SDK->>SDK: gzip batch, screenshot WebP
-  SDK->>API: POST /api/v1/capture/ingest
-  Note over SDK,API: X-Ingest-Key, Idempotency-Key
-  API->>API: Validate ingest key, rate limit, quota
-  API->>PG: INSERT report (pending) or upsert idempotent
-  API->>Redis: enqueue ingest.process
-  API-->>SDK: 202 { reportId, status: processing }
-  Worker->>Worker: Decompress if needed
-  Worker->>R2: PUT multipart if >5MB else PUT
+  alt Large payload (typical replay)
+    SDK->>API: POST /capture/presign
+    Note over SDK,API: X-Ingest-Key, Idempotency-Key
+    API->>API: Validate key, rate limit, quota
+    API->>PG: INSERT report (pending) or upsert idempotent
+    API->>R2: Generate presigned PUT URLs
+    API-->>SDK: 200 { reportId, uploads[] }
+    SDK->>R2: PUT replay/console/network/screenshot (direct)
+    SDK->>API: POST /capture/complete { reportId, r2Keys }
+    API->>Redis: enqueue ingest.finalize (refs only)
+    API-->>SDK: 202 { reportId, status: processing }
+  else Inline (≤1 MB metadata + screenshot)
+    SDK->>API: POST /capture/ingest (small body)
+    API->>API: Validate key, rate limit, quota
+    API->>PG: INSERT report (pending)
+    API->>R2: Stream body to R2 BEFORE ack
+    API->>Redis: enqueue ingest.finalize (refs only)
+    API-->>SDK: 202 { reportId, status: processing }
+  end
+  Worker->>R2: HEAD validate each r2Key exists
   Worker->>PG: INSERT report_blobs, UPDATE summary, FTS
   Worker->>PG: ingest_status=complete, increment usage
   Worker->>Redis: enqueue webhooks.dispatch report.created
@@ -402,9 +451,13 @@ sequenceDiagram
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| POST | `/api/v1/capture/ingest` | Ingest key | Full payload inline (<5MB typical) |
-| POST | `/api/v1/capture/presign` | Ingest key | Returns presigned PUT URLs for large batches |
-| POST | `/api/v1/capture/complete` | Ingest key | Finalize after presigned uploads |
+| POST | `/api/v1/capture/presign` | Ingest key | Issue presigned PUT URLs after auth + rate-limit check |
+| POST | `/api/v1/capture/complete` | Ingest key | Finalize after client R2 uploads; enqueues `ingest.finalize` |
+| POST | `/api/v1/capture/ingest` | Ingest key | Inline path only: ≤1 MB total; streams to R2 before ack |
+
+**Inline ack SLA:** E2 implementation must measure ack latency for the inline path. If the R2 round-trip breaks the inherited <200ms p95 ack target, relax p95 for the inline path only — durability (stream-to-R2-before-ack) is never weakened.
+
+**Stale pending cleanup:** Reports stuck in `ingest_status=pending` (presign issued but `/capture/complete` never called) older than 24h are swept by the retention/reconciliation job — delete row plus best-effort delete of any orphan R2 object. See §7 orphan reconciliation.
 
 ### Payload caps
 
@@ -412,8 +465,9 @@ sequenceDiagram
 | --- | --- |
 | Network request/response body (SDK) | 32 KB per request |
 | Instant replay buffer | 120s default (30–120 configurable) |
-| Ingest HTTP body | 32 MB hard reject at API |
-| Multipart threshold | 5 MB → R2 multipart upload |
+| Inline ingest total | **1 MB** hard reject — use presign path above |
+| Presigned multipart threshold | 5 MB per object → R2 multipart upload |
+| Presign path max per object | 32 MB |
 
 ### Idempotency
 
@@ -425,12 +479,12 @@ sequenceDiagram
 
 | Queue | Job name | Concurrency | Notes |
 | --- | --- | --- | --- |
-| `ingest` | `ingest.process` | 10 global; max 100 active per org (group) | Main pipeline |
+| `ingest` | `ingest.finalize` | 10 global; max 100 active per org (group) | Validates R2 refs, writes Postgres metadata |
 | `webhooks` | `webhooks.dispatch` | 20 | Fan-out per endpoint |
-| `webhooks` | `webhooks.deliver` | 10 | Single HTTP POST |
-| `deletion` | `deletion.*` | 2 | GDPR cascade steps |
-| `retention` | `retention.sweep` | 1 | Daily cron |
-| `integrations` | `integrations.linear_push` | 5 | Outbound Linear |
+| `webhooks` | `webhooks.deliver` | 10 | Single HTTP POST with SSRF checks |
+| `deletion` | `deletion.*` | 2 | GDPR cascade steps (see §9) |
+| `retention` | `retention.sweep` | 1 | Daily cron — **single retention authority** |
+| `integrations` | `integrations.linear_push` | 5 | Reads/writes `integration_operations` outbox |
 
 ---
 
@@ -442,12 +496,12 @@ sequenceDiagram
 | --- | --- | --- |
 | `ReportService` | `packages/services/src/report.ts` | `list`, `getById`, `getSummary`, `getConsoleLogs`, `getNetworkRequests`, `getReplayManifest`, `updateStatus`, `delete` |
 | `SearchService` | `packages/services/src/search.ts` | `searchReports` |
-| `CaptureIngestService` | `packages/services/src/ingest.ts` | `acceptIngest`, `processIngestJob`, `presignUpload`, `completeIngest` |
-| `CommentService` | `packages/services/src/comment.ts` | `list`, `create` (FF-1 for API; web uses session path at v1) |
-| `IntegrationService` | `packages/services/src/integration.ts` | `connectLinear`, `disconnect`, `pushReportToLinear` |
-| `WebhookService` | `packages/services/src/webhook.ts` | `register`, `dispatchEvent`, `deliver` |
-| `DeletionService` | `packages/services/src/deletion.ts` | `enqueueWorkspaceDeletion`, `processStep` |
-| `UsageService` | `packages/services/src/usage.ts` | `checkQuota`, `increment`, `getMonthlyUsage` |
+| `CaptureIngestService` | `packages/services/src/ingest.ts` | `presignUpload`, `acceptInlineIngest`, `completeIngest`, `processFinalizeJob` |
+| `CommentService` | `packages/services/src/comment.ts` | `list`, `create` — shared by web session route (FR-26) and API-key registry (FR-16 FF-1) |
+| `IntegrationService` | `packages/services/src/integration.ts` | `connectLinear`, `disconnect`, `pushReportToLinear` (outbox-backed) |
+| `WebhookService` | `packages/services/src/webhook.ts` | `register`, `dispatchEvent`, `deliver` (SSRF-safe) |
+| `DeletionService` | `packages/services/src/deletion.ts` | `enqueueWorkspaceDeletion`, `processStep` (tombstone-backed) |
+| `UsageService` | `packages/services/src/usage.ts` | `checkQuota`, `checkTierLimit`, `increment`, `getMonthlyUsage` |
 
 ### 5.2 Surface registry (`packages/contracts/src/surface-registry.ts`)
 
@@ -514,10 +568,23 @@ export const SURFACE_REGISTRY = [
 ] as const;
 ```
 
+**Web session comment route (FR-26, LG-2)** — bypasses surface registry (session auth, not API key):
+
+| Method | Path | Auth | Service |
+| --- | --- | --- | --- |
+| GET | `/api/web/reports/:id/comments` | Session cookie | `CommentService.list` |
+| POST | `/api/web/reports/:id/comments` | Session cookie + reporter+ RBAC | `CommentService.create` |
+
+Registered in `apps/api/src/routes/web/comments.ts` (not `/api/v1`). FR-16 `create_comment` (FF-1) reuses `CommentService.create` via registry when shipped.
+
 ### 5.3 Parity enforcement
 
 1. **Build-time:** Script `packages/contracts/scripts/validate-routes.ts` asserts every registry entry has matching Elysia route registration and MCP tool registration.
-2. **Test-time:** `packages/contracts/tests/parity.test.ts` seeds a fixture report, calls each operation via REST handler and MCP tool handler, deep-compares JSON payloads (ignoring envelope keys).
+2. **Test-time:** `packages/contracts/tests/parity.test.ts` spins up the real Elysia app and exercises **both transports end-to-end over HTTP**:
+   - REST: live `fetch()` to `/api/v1/*` with Bearer `ubr_live_*` fixtures
+   - MCP: Streamable HTTP client to `POST /mcp` with same keys
+   - Assertions: auth scopes, error envelopes (`FORBIDDEN`, `QUOTA_EXCEEDED`), Free-tier write rejection, filter params, cursor pagination — field-equivalent payloads across transports
+   - **Not** in-process handler calls; adapters must be wired
 3. **Review gate:** PR template checkbox — no inline DB queries in `apps/api/src/mcp` or `routes`.
 
 ### 5.4 MCP transport
@@ -525,6 +592,20 @@ export const SURFACE_REGISTRY = [
 - Path: `POST /mcp` (Streamable HTTP via `@modelcontextprotocol/sdk` v1.x)
 - Auth: `Authorization: Bearer ubr_live_*` — same middleware as REST
 - Tool handlers in `apps/api/src/mcp/tools/*.ts` — each ≤10 lines calling service
+
+### 5.5 Race-safe outbound effects
+
+**Linear push (FR-21) and future tracker pushes** use `integration_operations` outbox:
+
+1. `IntegrationService.pushReportToLinear` inserts row `(report_id, action='linear.push', status='pending')` — `UNIQUE (report_id, action)` prevents duplicate issues from concurrent ⌘K / bulk push
+2. On conflict:
+   - `status=succeeded` → return `external_url` immediately
+   - `status=pending` → return in-progress result; do **not** enqueue a second job
+   - `status=failed` → explicit retry flips row back to `pending` and enqueues once
+3. On fresh insert (or failed retry): enqueue `integrations.linear_push` with `{ operationId }` only (references, not payload bodies)
+4. Worker executes GraphQL create; on success sets `status=succeeded`, updates `reports.linear_issue_*`
+
+Same pattern applies to FR-25 GitHub push (v1.1).
 
 ---
 
@@ -536,6 +617,7 @@ flowchart TD
   PATH -->|/api/auth/*| BA[better-auth handler]
   PATH -->|/api/v1/capture/*| IK[Ingest Key Middleware]
   PATH -->|/mcp| AK[API Key / Bearer Middleware]
+  PATH -->|/api/web/*| SESS
   PATH -->|/api/v1/*| AUTH{Auth type?}
   AUTH -->|Cookie session| SESS[Session Middleware]
   AUTH -->|Bearer ubr_live_*| AK
@@ -553,6 +635,21 @@ flowchart TD
 - GitHub OAuth only (better-auth)
 - Organization plugin: active workspace via `authClient.organization.setActive()`
 - Session cookie for web; bearer plugin for automation
+- **Mandatory first workspace (FR-8):** Middleware in `apps/web` layout + `apps/api/src/middleware/onboarding-gate.ts` hard-redirects users with zero org memberships to `/onboarding` (HTTP 302) on any authenticated route including `/settings/*`. No workspace-scoped UI renders until create or accepted invite.
+
+### Tier enforcement (AD-11)
+
+Enforced in `UsageService.checkTierLimit()` at **service entry**, not UI-only:
+
+| Limit | Free | Pro | Studio / Agency (defined, not sellable v1) |
+| --- | --- | --- | --- |
+| Workspaces per user | 1 | 5 | Unlimited (stub) |
+| Reports/mo per workspace | 30 hard | 2,000 fair-use | TBD at GA |
+| Integrations | 1 | Unlimited | Unlimited |
+| Webhooks | — | Pro+ | Pro+ |
+| MCP/REST write | Read-only | Full | Full |
+
+Source: PRD §9 four-tier table. Studio/Agency add no v1 launch scope.
 
 ### API key auth
 
@@ -596,23 +693,29 @@ Free tier: scopes limited to `reports:read`, `mcp:tools` — write scopes reject
 
 **Presigned URLs (AD-6)** — not proxy:
 
-1. Web/MCP calls `GET /api/v1/reports/:id/replay-manifest` (internal) or `getReplayManifest` service
+1. Web app calls `GET /api/v1/reports/:id/replay-manifest` (session auth) or `ReportService.getReplayManifest` internally
 2. API returns `{ batches: [{ seq, url, expiresAt }], screenshotUrl }` — URLs are R2 presigned GET, TTL 15 minutes
-3. `rrweb-player` in web fetches batches directly from R2
+3. `rrweb-player` in web fetches batches directly from R2. Presigned replay URLs are **never** returned in MCP tool results; no replay-manifest operation exists in the surface registry
 4. CORS on R2 bucket: allow `app.usebugreport.com` origins
 
-### Retention enforcement
+### Retention authority
 
-| Tier | Replay | Screenshot | Postgres metadata |
+**Single authority:** `report_blobs.expires_at` + daily `retention.sweep` job. R2 bucket lifecycle rules are a **coarse safety backstop only** (global 120-day catchall on entire bucket — **not** per-org or per-tier rules).
+
+| Tier | Replay `expires_at` | Screenshot `expires_at` | Postgres metadata |
 | --- | --- | --- | --- |
-| Free | 7 days | 7 days | 30 days → summary stub |
-| Pro | 30 days | 90 days | Indefinite |
-| Studio | 90 days (stub) | 90 days | Indefinite |
+| Free | ingest + 7 days | ingest + 7 days | 30 days → summary stub |
+| Pro | ingest + 30 days | ingest + 90 days | Indefinite |
+| Studio (stub) | ingest + 90 days | ingest + 90 days | Indefinite |
+| Agency (stub) | ingest + 90 days min at GA | ingest + 90 days | Indefinite |
 
-**Dual enforcement:**
+**`retention.sweep` (daily):** Select `report_blobs WHERE expires_at < now()` → delete R2 object → delete row. Free metadata stub transition clears blob refs, keeps summary. Log counts per org.
 
-1. R2 lifecycle rules per prefix `{orgId}/` with tier-specific `Expiration.Days`
-2. Daily job `retention.sweep`: set `report_blobs.expires_at`, delete expired rows, transition Free reports to stub (clear blob refs, keep summary)
+**Tier upgrade/downgrade:** On `billing_tier` change, `UsageService.recomputeRetention(orgId)` batch-updates all `report_blobs.expires_at` for the org using `created_at + new_tier_days` (never shorten below already-expired). Downgrade applies on next billing period boundary.
+
+**Orphan reconciliation:** Sweep lists R2 keys under `{orgId}/` with no matching `report_blobs.r2_key` older than 24h → delete. Inverse: `report_blobs` rows pointing to missing R2 objects → mark report ingest failed, alert ops. **Stale pending reports:** `reports WHERE ingest_status='pending'` (presign issued but `/capture/complete` never called) older than 24h → delete row plus best-effort delete of any orphan R2 object (complements R2-side orphan sweep in §4).
+
+**R2 lifecycle backstop:** Single rule — abort incomplete multipart after 1 day; expire any object after 120 days globally. Does not replace per-blob `expires_at` logic.
 
 `AbortIncompleteMultipartUpload`: 1 day.
 
@@ -653,23 +756,38 @@ headers: {
 
 Store every attempt in `webhook_deliveries`. Debug UI at `/w/[slug]/settings/webhooks`.
 
+### SSRF controls
+
+Webhook delivery (`WebhookService.deliver`) enforces:
+
+1. **HTTPS only** — reject `http://` URLs at registration and delivery
+2. **Block private/reserved ranges** at registration DNS resolve and **re-validate at delivery time** to close the DNS-rebinding TOCTOU window: resolve the hostname once, validate the resolved IP against deny ranges (loopback `127.0.0.0/8`, `::1`; RFC1918; link-local `169.254.0.0/16`, `fe80::/10`; cloud metadata `169.254.169.254`; CGNAT `100.64.0.0/10`), then **pin** the connection to that validated IP — connect by IP with `Host` header and TLS SNI set to the original hostname
+3. Redirect following disabled; single-hop delivery only
+4. Timeouts: connect 5s, total 30s
+
+Failed SSRF check → mark delivery `failed`, do not retry.
+
 ---
 
 ## 9. GDPR Cascading Deletion
 
 Triggered from `/w/[slug]/settings/danger` → `DeletionService.enqueueWorkspaceDeletion`.
 
-| Step | Job | Action |
-| --- | --- | --- |
-| 0 | immediate | Revoke all `ingest_keys`, `workspace_api_keys`; disable webhooks |
-| 1 | `deletion.r2_purge` | List + batch delete `/{orgId}/` prefix (1000 keys/batch) |
-| 2 | `deletion.postgres_purge` | Delete reports → comments → blobs → projects → integrations → webhooks → usage → org |
-| 3 | `deletion.redis_purge` | `SCAN` delete `ubr:ratelimit:{orgId}:*`, `ubr:cache:{orgId}:*` |
-| 4 | `deletion.audit_complete` | Insert `audit_log`; email owner; mark job complete |
+**Tombstone outside tenant cascade:** `deletion_tombstones` has **no FK to `organizations`**. Deletion job state survives until Postgres purge completes — prevents self-invalidating cascade if org row deleted first.
 
-**SLA:** p95 ≤ 72 hours. Status pollable via `GET /api/v1/workspaces/:id/deletion-status` (owner only).
+| Step | Job | Action | Idempotency |
+| --- | --- | --- | --- |
+| 0 | immediate | Revoke all `ingest_keys`, `workspace_api_keys`; disable webhooks | Re-run safe (already revoked) |
+| 1 | `deletion.notify_owner` | Snapshot owner email to tombstone; send started + terminal emails | Skip if `last_completed_step ≥ notify` |
+| 2 | `deletion.external_purge` | Batch delete R2 `/{orgId}/` prefix (1000 keys/batch); `SCAN` delete Redis `ubr:*:{orgId}:*` | List-and-delete idempotent |
+| 3 | `deletion.audit_terminal` | Write terminal audit to tombstone + `audit_log` (metadata only) | Upsert on tombstone id |
+| 4 | `deletion.postgres_purge` | **Last:** delete reports → comments → blobs → projects → integrations → webhooks → usage → org | Transaction per table batch |
 
-**Audit:** 90-day retention; event metadata only — no report bodies.
+**Retry:** Each step updates `deletion_tombstones.last_completed_step` on success. Failed step retries with exponential backoff; resume from last completed step.
+
+**SLA:** p95 ≤ 72 hours. Status pollable via `GET /api/v1/workspaces/:id/deletion-status` (owner only) — reads tombstone by org id until purge completes.
+
+**Audit:** 90-day retention on `audit_log` and completed tombstones; event metadata only — no report bodies.
 
 ---
 
@@ -722,6 +840,7 @@ Triggered from `/w/[slug]/settings/danger` → `DeletionService.enqueueWorkspace
 
 - Pino JSON via `packages/config/logger.ts`
 - Required fields: `traceId`, `organizationId`, `reportId` (when applicable)
+- **Redact:** `r2Key`, presigned URLs, raw blob keys — never logged (system invariant)
 - Log levels: error for ingest failures, warn for webhook retries
 
 ### Metrics (minimal v1)
@@ -786,18 +905,19 @@ Cursor encodes `(created_at, id)` tuple — stable sort.
 | Layer | Tool | Scope |
 | --- | --- | --- |
 | Unit | bun test | Services with mocked db/storage |
-| Parity | bun test | `packages/contracts/tests/parity.test.ts` |
-| Integration | bun test | API routes against test Postgres (Docker) |
+| Parity | bun test | `parity.test.ts` — real HTTP to REST + MCP Streamable HTTP; scopes, errors, Free write denial, filters, cursors |
+| Integration | bun test | API routes against test Postgres (Docker); web comment session route; onboarding gate |
 | E2E | Playwright | Login → list → detail → replay load → Linear push mock → ⌘K |
 | SDK | bun test | capture-core buffer, redaction, gzip |
 
 **Critical Playwright paths (LG gates):**
 
-1. GitHub OAuth mock → onboarding → first report poll
-2. Report list keyboard nav (j/k/x/Enter)
-3. ⌘K push to Linear
+1. GitHub OAuth mock → onboarding hard gate (FR-8) → first report poll
+2. Report list keyboard nav (j/k/x/Enter); bulk status change; bulk Linear push
+3. ⌘K push to Linear (concurrent dedupe via outbox)
 4. Workspace switch ⌘1
-5. GDPR deletion flow (staging org)
+5. GDPR deletion flow (staging org); tombstone survives purge
+6. Web comments composer (FR-26, LG-2)
 
 ---
 
@@ -827,15 +947,15 @@ Cursor encodes `(created_at, id)` tuple — stable sort.
 | Epic | Primary packages / apps | Key tables / routes |
 | --- | --- | --- |
 | E1 SDK | `packages/capture-core`, `packages/sdk` | — |
-| E2 Ingest | `CaptureIngestService`, `apps/worker/ingest` | `reports`, `report_blobs`, `POST /capture/ingest` |
-| E3 Web | `apps/web` | All `/w/[slug]/*` routes |
-| E4 Auth | better-auth, `project_members` | `ingest_keys`, `workspace_api_keys` |
+| E2 Ingest | `CaptureIngestService`, `apps/worker/ingest` | `reports`, `report_blobs`, presign/complete/inline ingest |
+| E3 Web | `apps/web`, `POST /api/web/reports/:id/comments` | `/w/[slug]/*`, bulk status change, bulk Linear push, FR-26 comments |
+| E4 Auth | better-auth, `project_members`, onboarding gate | `ingest_keys`, `workspace_api_keys`, AD-11 tier checks |
 | E5 MCP | `apps/api/src/mcp` | `/mcp`, tools per registry |
 | E6 REST | `apps/api/src/routes` | `/api/v1/*` |
-| E7 Linear | `IntegrationService` | `integrations`, `reports.linear_*` |
-| E8 Webhooks | `WebhookService` | `webhook_endpoints`, `webhook_deliveries` |
-| E9 GDPR | `DeletionService` | `deletion_jobs`, `audit_log` |
-| E10 FF-1 | `CommentService` | `report_comments`, `create_comment` |
+| E7 Linear | `IntegrationService`, `integration_operations` | `integrations`, outbox-backed push |
+| E8 Webhooks | `WebhookService` | `webhook_endpoints`, `webhook_deliveries`, SSRF controls |
+| E9 GDPR | `DeletionService` | `deletion_tombstones`, `audit_log` |
+| E10 FF-1 | `CommentService` | `report_comments`, registry `create_comment` + shared web route |
 | E11 v1.1 | deferred | — |
 
 ---
@@ -847,7 +967,7 @@ Cursor encodes `(created_at, id)` tuple — stable sort.
 | `elysia-mcp` auto-expose REST as tools | Explicit tool registration from `surface-registry` | Finer control for Jam-parity tool schemas; avoids coarse auto-mapping |
 | Optional Redis session cache | DB sessions initially via better-auth | YAGNI — add Redis session cache if latency measured |
 | `capture-sdk` package name | `packages/sdk` publishing `@usebugreport/browser` | User stack spec; capture-core stays internal |
-| Presigned URL **or** direct ingest | Both: inline POST for typical payloads + presign for >5MB | Covers SPA 2-min replay under 5MB common case; multipart path for heavy sessions |
+| Presigned URL **or** direct ingest | Presign PUT (client → R2) + inline ≤1 MB stream-before-ack; BullMQ refs only | Durable ingest; no blob bytes in queue (review fix) |
 | Single Elysia process for worker | Separate `apps/worker` container | Isolates CPU-heavy gzip/R2 from API latency (SM-5, SM-6) |
 | EU hosting open question | Contabo Frankfurt chosen | PRD §14 Q3 settled for v1 |
 
@@ -865,8 +985,44 @@ Cursor encodes `(created_at, id)` tuple — stable sort.
 | `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET` | api | Integration |
 | `APP_URL`, `API_URL` | web, api | OAuth redirects, CORS |
 | `RESEND_API_KEY` or equivalent | worker | Deletion complete email |
+| `WORKER_CONCURRENCY` | worker | BullMQ concurrency (default 8; RSS-adjusted) |
 
 ---
 
-**Document status:** final  
+## 18. Requirements Traceability Matrix (FR-1..FR-26)
+
+Complete FR coverage — each row maps requirement → architecture anchor → verification.
+
+| FR | Requirement (summary) | Architecture decision / service / epic | Enforcement / verification |
+| --- | --- | --- | --- |
+| FR-1 | SDK instant replay capture | AD-4, E1 `capture-core`/`sdk`, E2 presign path | SDK unit tests; ingest E2E p95 < 5s (SM-5) |
+| FR-2 | Console/network privacy redaction | E1 `capture-core` plugins | SDK unit tests: maskInputs, header redaction, 32 KB cap |
+| FR-3 | Screenshot + metadata at submit | AD-4, `CaptureIngestService`, R2 key layout §7 | Integration test: blobs in R2, pointers in Postgres |
+| FR-4 | Ingest auth + rate limits | AD-4, AD-9, AD-11, `UsageService`, `CaptureIngestService` | Integration: 401 invalid key, 429 quota/rate; concurrent job cap |
+| FR-5 | Report metadata + FTS | AD-7, `ReportService`, `SearchService`, E2 | Unit tests; GIN index migration; search query tests |
+| FR-6 | Replay viewer | AD-6, E3 `ReplayViewer`, `getReplayManifest` | Playwright LG-2: replay tab loads via presigned URLs |
+| FR-7 | Tiered blob retention | `report_blobs.expires_at`, `retention.sweep`, §7 authority | Sweep job tests; tier recompute on billing change |
+| FR-8 | Workspace/project CRUD + first-workspace gate | AD-3, AD-11, E3/E4, onboarding middleware | Playwright: zero-org → `/onboarding` 302; tier workspace limits in `UsageService` tests |
+| FR-9 | Project RBAC | AD-3, `project_members`, service entry checks | Integration tests per role (viewer/reporter/developer/admin) |
+| FR-10 | GDPR cascading deletion | AD-8, E9 `DeletionService`, `deletion_tombstones` | Playwright GDPR flow; step resume idempotency tests; tombstone survives org purge |
+| FR-11 | Dense list + keyboard nav + bulk actions | AD-10, E3 bulk status + bulk Linear push | Playwright j/k/x; bulk mutation API tests |
+| FR-12 | Command palette ⌘K | AD-10, E3 spotlight registry | Playwright ⌘K commands (SM-3) |
+| FR-13 | Workspace switcher ⌘1–9 | E3, `user_preferences.pinned_workspace_ids` | Playwright workspace switch; query scope tests |
+| FR-14 | MCP authentication + Free read-only | AD-11, E5 auth middleware | Parity HTTP tests: Free key write → `FORBIDDEN` |
+| FR-15 | MCP read tool suite | AD-2, E5/E6 surface registry | `parity.test.ts` HTTP e2e all read tools + filters/cursors |
+| FR-16 | Agent create_comment (FF-1) | AD-1, AD-2, E10 `CommentService` | Parity HTTP e2e post-launch; dedupe key test |
+| FR-17 | REST report endpoints | AD-2, E6 | `parity.test.ts` REST side; OpenAPI schema validation |
+| FR-18 | Shared service layer | AD-1 | CI lint: no Drizzle/R2 in `routes/` or `mcp/`; code review gate |
+| FR-19 | Outbound webhooks Pro+ | AD-11, E8 `WebhookService`, SSRF §8 | Tier gate test; delivery + SSRF block integration tests |
+| FR-20 | Linear OAuth config | E7 `IntegrationService` | OAuth mock flow; encrypted token storage test |
+| FR-21 | Push report to Linear | AD-5, §5.5 outbox, E7 | Outbox UNIQUE concurrency test; SM-4 success rate |
+| FR-22 | Workspace API key management | AD-11, E4 | Admin CRUD tests; scope checkbox enforcement |
+| FR-23 | Session + bearer auth | E4 better-auth | 401 revoked/expired key; last_used_at update |
+| FR-24 | Linear inbound sync (v1.1) | E11 deferred | — (post-v1 scope) |
+| FR-25 | GitHub Issues outbound (v1.1) | E11 deferred, §5.5 pattern | — (post-v1 scope) |
+| FR-26 | Web app report comments | E3 `POST /api/web/reports/:id/comments`, `CommentService` | Playwright LG-2: composer, optimistic append, viewer read-only |
+
+---
+
+**Document status:** final (revision pass 2026-07-20)  
 **Next workflow:** `bmad-create-epics-and-stories` — cite AD IDs and §15 epic map
