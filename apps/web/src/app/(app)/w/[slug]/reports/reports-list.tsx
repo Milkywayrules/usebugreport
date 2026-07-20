@@ -1,5 +1,6 @@
 "use client";
 
+import { notifications } from "@mantine/notifications";
 import {
   Badge,
   Checkbox,
@@ -11,7 +12,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   flexRender,
   getCoreRowModel,
@@ -22,6 +23,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReportListRow } from "@/lib/api-server";
+
+import { BulkStatusBar } from "@/components/reports/bulk-status-bar";
+import {
+  REPORT_STATUS_BY_DIGIT,
+  type ReportStatusValue,
+} from "@/lib/reports/status";
+import { patchReportStatus } from "@/lib/reports/update-status-api";
+import { GLOBAL_SHORTCUTS } from "@/keyboard/shortcuts";
+import { useHotkeys } from "@mantine/hooks";
 import { useReportListHotkeys } from "@/keyboard/use-report-list-hotkeys";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -84,12 +94,87 @@ export function ReportsList({
     return params;
   }, [project, q, since, status]);
 
+  const queryClient = useQueryClient();
+
   const reportsQuery = useQuery({
     queryKey: ["reports", organizationId, queryString.toString()],
     queryFn: () => loadReports(queryString),
   });
 
   const rows = reportsQuery.data?.data ?? [];
+
+  const applyStatusMutation = useMutation({
+    mutationFn: async ({
+      reportIds,
+      status,
+    }: {
+      reportIds: string[];
+      status: ReportStatusValue;
+    }) => {
+      const results = await Promise.allSettled(
+        reportIds.map((id) => patchReportStatus(id, status))
+      );
+      const failed = results.filter((row) => row.status === "rejected").length;
+      const updated = reportIds.length - failed;
+      return { failed, status, updated };
+    },
+    onMutate: async ({ reportIds, status }) => {
+      const key = ["reports", organizationId, queryString.toString()];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<{
+        data: ReportListRow[];
+        page: { hasMore: boolean; nextCursor: string | null };
+      }>(key);
+      if (previous) {
+        queryClient.setQueryData(key, {
+          ...previous,
+          data: previous.data.map((row) =>
+            reportIds.includes(row.id) ? { ...row, status } : row
+          ),
+        });
+      }
+      return { key, previous };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.key, context.previous);
+      }
+      notifications.show({
+        color: "red",
+        message: "Status update failed.",
+        title: "Bulk update",
+      });
+    },
+    onSuccess: ({ failed, updated }) => {
+      if (failed > 0) {
+        notifications.show({
+          color: "yellow",
+          message: `${updated} updated, ${failed} failed`,
+          title: "Bulk update",
+        });
+      }
+    },
+    onSettled: (_data, _error, _vars, context) => {
+      if (context?.key) {
+        queryClient.invalidateQueries({ queryKey: context.key });
+      }
+    },
+  });
+
+  const applyStatusToTargets = (status: ReportStatusValue) => {
+    if (!canEdit) return;
+    const focused = rows[focusedIndex];
+    const targetIds =
+      selected.size > 0
+        ? [...selected]
+        : focused
+          ? [focused.id]
+          : [];
+    if (targetIds.length === 0) return;
+    applyStatusMutation.mutate({ reportIds: targetIds, status });
+  };
+
+
 
   const updateParam = useCallback(
     (key: string, value: string) => {
@@ -146,7 +231,11 @@ export function ReportsList({
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => <Badge variant="light">{row.original.status}</Badge>,
+        cell: ({ row }) => (
+          <Badge data-testid={`report-status-${row.original.id}`} variant="light">
+            {row.original.status}
+          </Badge>
+        ),
       },
       { accessorKey: "title", header: "Title" },
       { accessorKey: "projectName", header: "Project" },
@@ -214,6 +303,10 @@ export function ReportsList({
     onSelectAllVisible: () => {
       setSelected(new Set(rows.map((row) => row.id)));
     },
+    onStatusDigit: (digit) => {
+      const status = REPORT_STATUS_BY_DIGIT[digit];
+      if (status) applyStatusToTargets(status);
+    },
     onToggleSelect: () => {
       if (!focusedRow) return;
       setSelected((prev) => {
@@ -224,6 +317,18 @@ export function ReportsList({
       });
     },
   });
+
+
+  useHotkeys([
+    [
+      GLOBAL_SHORTCUTS.escape.keys,
+      (event) => {
+        if (selected.size === 0) return;
+        event.preventDefault();
+        setSelected(new Set());
+      },
+    ],
+  ]);
 
 
   return (
@@ -320,6 +425,11 @@ export function ReportsList({
       {!reportsQuery.isLoading && rows.length === 0 ? (
         <Text c="dimmed">No reports match these filters.</Text>
       ) : null}
+      <BulkStatusBar
+        onChangeStatus={applyStatusToTargets}
+        onClear={() => setSelected(new Set())}
+        selectedCount={selected.size}
+      />
     </Stack>
   );
 }

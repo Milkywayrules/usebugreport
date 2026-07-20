@@ -7,6 +7,7 @@ import type { Elysia } from "elysia";
 import { db } from "../lib/auth";
 import { getEnv } from "../lib/env";
 import { serviceErrorToHttp } from "../lib/errors";
+import { readJsonBody } from "../lib/request-body";
 import { INTEGRATION_PUBLIC_TAG } from "../lib/route-tags";
 import { resolveAuthContext } from "../middleware/auth-context";
 import { requireSession } from "../middleware/session";
@@ -314,6 +315,62 @@ export function registerReportRoutes(app: unknown): unknown {
         return handleServiceError(error, authResult.value.requestId);
       }
     })
+    .patch("/api/v1/reports/:reportId/status", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const resolved = await resolveAuthContext(db, authResult.value);
+      if ("error" in resolved) {
+        return jsonResponse(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          403
+        );
+      }
+
+      const body = await readJsonBody<{ status?: unknown }>(context.request);
+      if (!body?.status) {
+        return jsonResponse(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "status is required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          422
+        );
+      }
+
+      try {
+        const report = await reportService.updateStatus(
+          resolved,
+          context.params.reportId,
+          body.status as "closed" | "duplicate" | "in_progress" | "open" | "resolved"
+        );
+
+        return {
+          data: {
+            ...report,
+            createdAt: report.createdAt.toISOString(),
+            updatedAt: report.updatedAt.toISOString(),
+          },
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    })
+
     .get("/api/v1/reports/search", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext
