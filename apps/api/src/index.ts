@@ -14,6 +14,7 @@ import { serviceErrorToHttp } from "./lib/errors";
 import { readJsonBody } from "./lib/request-body";
 import { onboardingGateMiddleware } from "./middleware/onboarding-gate";
 import { requireSession, sessionMiddleware } from "./middleware/session";
+import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWorkspaceRoutes } from "./routes/workspaces";
@@ -164,7 +165,9 @@ const baseApp = new Elysia()
   });
 
 const appWithRoutes = registerUserPreferenceRoutes(
-  registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+  registerProjectMemberRoutes(
+    registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+  )
 ) as typeof baseApp;
 
 let app = appWithRoutes as typeof baseApp;

@@ -1,6 +1,13 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import type { DbClient } from "@usebugreport/db";
-import { ingestKeys, organization, projects } from "@usebugreport/db";
+import {
+  ingestKeys,
+  member,
+  organization,
+  projectMembers,
+  projects,
+  user,
+} from "@usebugreport/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { createProjectService } from "./project";
 
@@ -23,6 +30,7 @@ runDbTests("ProjectService", () => {
   beforeEach(async () => {
     await db.execute(sql`
       truncate table
+        project_members,
         ingest_keys,
         projects,
         user_preferences,
@@ -47,14 +55,40 @@ runDbTests("ProjectService", () => {
       name: "Project Org",
       slug: "project-org",
     });
+
+    await db.insert(user).values({
+      createdAt: new Date(),
+      email: "owner@example.com",
+      emailVerified: true,
+      id: userId,
+      name: "Owner",
+      updatedAt: new Date(),
+    });
+
+    await db.insert(member).values({
+      createdAt: new Date(),
+      id: "member_project_test",
+      organizationId: orgId,
+      role: "owner",
+      userId,
+    });
   });
+
+  function ctx(orgRole: "owner" | "admin" | "member" = "owner") {
+    return {
+      organizationId: orgId,
+      orgRole,
+      projectIds: [] as string[],
+      type: "session" as const,
+      userId,
+    };
+  }
 
   test("creates project with hashed ingest key and returns plaintext once", async () => {
     const projectService = createProjectService(db);
-    const ctx = { organizationId: orgId, type: "session" as const, userId };
 
     const { ingestKeyPlaintext, project } = await projectService.createProject(
-      ctx,
+      ctx(),
       {
         name: "Web App",
       }
@@ -68,6 +102,15 @@ runDbTests("ProjectService", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.keyHash).not.toBe(ingestKeyPlaintext);
 
+    const memberRows = await db.select().from(projectMembers);
+    expect(memberRows).toEqual([
+      expect.objectContaining({
+        projectId: project.id,
+        role: "admin",
+        userId,
+      }),
+    ]);
+
     const validated =
       await projectService.validateIngestKey(ingestKeyPlaintext);
     expect(validated).toEqual({
@@ -78,16 +121,15 @@ runDbTests("ProjectService", () => {
 
   test("rotation revokes prior key immediately", async () => {
     const projectService = createProjectService(db);
-    const ctx = { organizationId: orgId, type: "session" as const, userId };
 
-    const created = await projectService.createProject(ctx, {
+    const created = await projectService.createProject(ctx(), {
       name: "Rotate Me",
     });
     const createdProject = created.project;
     const oldKey = created.ingestKeyPlaintext;
 
     const rotated = await projectService.rotateIngestKey(
-      ctx,
+      ctx(),
       createdProject.id
     );
     expect(rotated.ingestKeyPlaintext).not.toBe(oldKey);
@@ -114,10 +156,9 @@ runDbTests("ProjectService", () => {
 
   test("rejects cross-tenant project access", async () => {
     const projectService = createProjectService(db);
-    const created = await projectService.createProject(
-      { organizationId: orgId, type: "session", userId },
-      { name: "Scoped" }
-    );
+    const created = await projectService.createProject(ctx(), {
+      name: "Scoped",
+    });
 
     await expect(
       projectService.getProject(
@@ -127,12 +168,9 @@ runDbTests("ProjectService", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
-  test("listProjects scopes to organization", async () => {
+  test("listProjects scopes to accessible projects for org members", async () => {
     const projectService = createProjectService(db);
-    await projectService.createProject(
-      { organizationId: orgId, type: "session", userId },
-      { name: "One" }
-    );
+    const created = await projectService.createProject(ctx(), { name: "One" });
 
     await db.insert(organization).values({
       billingTier: "free",
@@ -149,13 +187,52 @@ runDbTests("ProjectService", () => {
       slug: "other-project",
     });
 
-    const listed = await projectService.listProjects({
-      organizationId: orgId,
-      type: "session",
-      userId,
-    });
+    const listed = await projectService.listProjects(ctx("member"));
 
     expect(listed.data).toHaveLength(1);
-    expect(listed.data[0]?.organizationId).toBe(orgId);
+    expect(listed.data[0]?.id).toBe(created.project.id);
+  });
+
+  test("member CRUD enforces admin role and org membership", async () => {
+    const projectService = createProjectService(db);
+    const created = await projectService.createProject(ctx(), { name: "Team" });
+
+    await db.insert(user).values({
+      createdAt: new Date(),
+      email: "teammate@example.com",
+      emailVerified: true,
+      id: "user_teammate",
+      name: "Teammate",
+      updatedAt: new Date(),
+    });
+
+    await db.insert(member).values({
+      createdAt: new Date(),
+      id: "member_teammate",
+      organizationId: orgId,
+      role: "member",
+      userId: "user_teammate",
+    });
+
+    const adminCtx = ctx();
+    const added = await projectService.addProjectMember(
+      adminCtx,
+      created.project.id,
+      { role: "viewer", userId: "user_teammate" }
+    );
+    expect(added.role).toBe("viewer");
+
+    const members = await projectService.listProjectMembers(
+      adminCtx,
+      created.project.id
+    );
+    expect(members).toHaveLength(2);
+
+    await expect(
+      projectService.addProjectMember(adminCtx, created.project.id, {
+        role: "viewer",
+        userId: "user_outsider",
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });

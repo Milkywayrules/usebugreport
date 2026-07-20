@@ -41,6 +41,11 @@ export default async function AppLayout({
         </Group>
         <Group gap="sm">
           <Link href="/settings/workspaces">Workspaces</Link>
+          {workspaces.some(
+            (row) => row.role === "owner" || row.role === "admin"
+          ) && activeSlug ? (
+            <Link href={`/w/${activeSlug}/settings/members`}>Members</Link>
+          ) : null}
           <Link href="/settings/account">Account</Link>
         </Group>
       </header>

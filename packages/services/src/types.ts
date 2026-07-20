@@ -1,7 +1,25 @@
 import type { BillingTier } from "@usebugreport/config";
 
+export type OrgRole = "owner" | "admin" | "member";
+
+export type ProjectRole = "viewer" | "reporter" | "developer" | "admin";
+
+export type ProjectAction =
+  | "project:read"
+  | "ingest:submit"
+  | "integration:manage"
+  | "linear:push"
+  | "report:delete"
+  | "project:manage_members"
+  | "ingest:rotate"
+  | "project:delete"
+  | "project:update";
+
 export interface AuthContext {
+  apiKeyId?: string;
   organizationId: string;
+  orgRole?: OrgRole;
+  projectIds?: string[];
   requestId?: string;
   type: "session";
   userId: string;
