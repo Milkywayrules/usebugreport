@@ -107,8 +107,8 @@ development_status:
   5-2-mcp-read-tools-from-surface-registry: backlog
   5-3-mcp-parity-contract-tests-streamable-http: backlog
   epic-5-retrospective: optional
-  epic-8: backlog  # E8 (launch)
-  8-1-webhook-registration-with-pro-tier-gate: backlog
+  epic-8: in-progress  # E8 (launch)
+  8-1-webhook-registration-with-pro-tier-gate: review
   8-2-webhook-dispatch-and-hmac-delivery: backlog
   8-3-ssrf-controls-with-ip-pinning-at-delivery: backlog
   8-4-webhook-debug-ui: backlog
