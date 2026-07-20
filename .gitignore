@@ -15,3 +15,6 @@ dist/
 !.env.example
 
 *.tsbuildinfo
+
+# agent harness secrets
+.github-agent.local

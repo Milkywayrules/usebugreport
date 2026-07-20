@@ -1,0 +1,37 @@
+---
+description: verasic-github-env — load GH_TOKEN via load-gh-env.sh for gh; secrets tiers local/CI/production
+alwaysApply: true
+---
+
+# verasic-github-env
+
+Local GitHub CLI auth for AI agent harnesses. Full spec:
+`.cursor/skills/verasic-github-env/references/setup-protocol.md`
+
+## Secrets tiers (never mix)
+
+- **local agents** → `.github-agent.local` (+ optional `direnv` via repo-root `.envrc`)
+- **CI** → GitHub Actions secrets / `GITHUB_TOKEN`
+- **production** → Doppler, Vault, Coolify — not agent credential files
+
+## Before any `gh` command
+
+If `GH_TOKEN` is unset, load credentials without executing env files:
+
+```bash
+source .cursor/skills/verasic-github-env/scripts/load-gh-env.sh
+```
+
+Verify with `bash .cursor/skills/verasic-github-env/scripts/check-gh.sh` — not bare `gh auth status` (can leak a token prefix).
+
+## Usage
+
+- use `gh` for PRs, issues, workflow runs — not browser automation for GitHub
+- pass `-R "${GH_REPO}"` when repo auto-detection fails
+- `git push` over SSH uses SSH keys; `GH_TOKEN` is for `gh` / GitHub API only
+- never log, echo, or commit `GH_TOKEN`, `GITHUB_TOKEN`, or PAT strings
+
+## Verify / bootstrap
+
+- verify: `bash .cursor/skills/verasic-github-env/scripts/check-gh.sh`
+- wire new repo: `/verasic-setup-github` or `scripts/bootstrap.sh`
