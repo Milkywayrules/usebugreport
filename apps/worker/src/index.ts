@@ -1,14 +1,20 @@
 import { createIngestFinalizeWorker } from "./jobs/ingest";
+import { createRetentionSweepWorker } from "./jobs/retention";
 
 export function bootWorker() {
-  const worker = createIngestFinalizeWorker();
-  worker.on("failed", (job, error) => {
+  const ingestWorker = createIngestFinalizeWorker();
+  const retentionWorker = createRetentionSweepWorker();
+  ingestWorker.on("failed", (job, error) => {
     console.error("ingest worker job failed", job?.id, error.message);
   });
-  return worker;
+  retentionWorker.on("failed", (job, error) => {
+    console.error("retention worker job failed", job?.id, error.message);
+  });
+  return { ingestWorker, retentionWorker };
 }
 
 if (import.meta.main) {
-  const worker = bootWorker();
-  console.log(`ingest.finalize worker listening on queue "${worker.name}"`);
+  const { ingestWorker, retentionWorker } = bootWorker();
+  console.log(`ingest.finalize worker listening on queue "${ingestWorker.name}"`);
+  console.log(`retention.sweep worker listening on queue "${retentionWorker.name}"`);
 }

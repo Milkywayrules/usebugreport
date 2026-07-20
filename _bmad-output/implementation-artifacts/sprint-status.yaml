@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 19:00"
+last_updated: "2026-07-20 19:10"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -76,7 +76,7 @@ development_status:
   2-4-ingest-finalize-worker: done
   2-5-reportservice-metadata-reads-and-replay-manifest: done
   2-6-usage-quotas-and-ingest-rate-limits: done
-  2-7-retention-sweep-and-stale-pending-cleanup: backlog
+  2-7-retention-sweep-and-stale-pending-cleanup: review
   2-8-worker-container-ops-memory-rss-concurrency-graceful-shutdown: backlog
   epic-2-retrospective: optional
   1-5-sdk-submit-widget-shadow-dom: done
