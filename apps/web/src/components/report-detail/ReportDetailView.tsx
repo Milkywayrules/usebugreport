@@ -1,7 +1,9 @@
 "use client";
 
 import { Alert, Group, Stack, Tabs, Title } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRegisterSpotlightBridge } from "@/keyboard/spotlight-command-context";
+import { patchReportStatus } from "@/lib/reports/update-status-api";
 import { fetchReportDetail } from "@/lib/report-detail/client-api";
 import { ConsolePanel } from "./ConsolePanel";
 import { MetadataPanel } from "./MetadataPanel";
@@ -15,6 +17,23 @@ export function ReportDetailView({
   reportId: string;
   workspaceSlug: string;
 }) {
+  const queryClient = useQueryClient();
+
+  useRegisterSpotlightBridge(
+    {
+      canEdit: true,
+      patchStatus: async (id, status) => {
+        await patchReportStatus(id, status);
+        await queryClient.invalidateQueries({ queryKey: ["report", reportId] });
+      },
+      projects: [],
+      reportId,
+      selectedReportIds: [],
+      workspaceSlug,
+    },
+    [queryClient, reportId, workspaceSlug]
+  );
+
   const reportQuery = useQuery({
     queryFn: () => fetchReportDetail(reportId),
     queryKey: ["report", reportId, "detail"],
