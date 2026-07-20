@@ -1,16 +1,25 @@
 import type { DbClient } from "@usebugreport/db";
 import type { R2Client } from "@usebugreport/storage";
 import {
+  auditLog,
   deletionTombstones,
   ingestKeys,
+  integrationOperations,
+  integrations,
   member,
   organization,
   projects,
+  reportBlobs,
+  reportComments,
+  reports,
   user,
+  webhookDeliveries,
   webhookEndpoints,
   workspaceApiKeys,
+  workspaceUsageMonthly,
 } from "@usebugreport/db";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { sendDeletionLifecycleEmail } from "./deletion-email";
 import { generatePrefixedId } from "./project";
 import type { AuthContext } from "./types";
 import { requireSessionUserId, ServiceError } from "./types";
@@ -281,6 +290,8 @@ export function createDeletionService(db: DbClient, deps: DeletionServiceDeps) {
         })
         .where(eq(deletionTombstones.id, payload.tombstoneId));
 
+      await deps.enqueueDeletionJob("deletion.audit_terminal", payload);
+
       return removedObjects;
     },
 
@@ -307,7 +318,186 @@ export function createDeletionService(db: DbClient, deps: DeletionServiceDeps) {
         })
         .where(eq(deletionTombstones.id, payload.tombstoneId));
 
+      await sendDeletionLifecycleEmail({
+        organizationSlug: tombstone.organizationSlug,
+        ownerEmail: tombstone.ownerEmail,
+        phase: "started",
+      });
+
       await deps.enqueueDeletionJob("deletion.external_purge", payload);
+    },
+
+    async processAuditTerminal(payload: DeletionEnqueuePayload): Promise<void> {
+      const [tombstone] = await db
+        .select()
+        .from(deletionTombstones)
+        .where(eq(deletionTombstones.id, payload.tombstoneId))
+        .limit(1);
+
+      if (!tombstone || tombstone.organizationId !== payload.organizationId) {
+        throw new ServiceError("NOT_FOUND", "Deletion tombstone not found.");
+      }
+
+      if (stepRank(tombstone.lastCompletedStep) >= stepRank(DELETION_STEPS.AUDIT_TERMINAL)) {
+        return;
+      }
+
+      if (stepRank(tombstone.lastCompletedStep) < stepRank(DELETION_STEPS.EXTERNAL_PURGE)) {
+        throw new ServiceError(
+          "VALIDATION_ERROR",
+          "Audit terminal cannot run before external purge completes."
+        );
+      }
+
+      const [[reportCountRow], [commentCountRow], [projectCountRow]] = await Promise.all([
+        db
+          .select({ count: sql<number>`count(*)`.mapWith(Number) })
+          .from(reports)
+          .where(eq(reports.organizationId, payload.organizationId)),
+        db
+          .select({ count: sql<number>`count(*)`.mapWith(Number) })
+          .from(reportComments)
+          .where(eq(reportComments.organizationId, payload.organizationId)),
+        db
+          .select({ count: sql<number>`count(*)`.mapWith(Number) })
+          .from(projects)
+          .where(eq(projects.organizationId, payload.organizationId)),
+      ]);
+
+      const auditMetadata = {
+        commentCount: commentCountRow?.count ?? 0,
+        organizationId: payload.organizationId,
+        organizationSlug: tombstone.organizationSlug,
+        projectCount: projectCountRow?.count ?? 0,
+        reportCount: reportCountRow?.count ?? 0,
+        tombstoneId: payload.tombstoneId,
+      };
+
+      const auditId = generatePrefixedId("aud");
+      await db.insert(auditLog).values({
+        eventType: "workspace.deletion.terminal",
+        id: auditId,
+        metadata: auditMetadata,
+        organizationId: payload.organizationId,
+        tombstoneId: payload.tombstoneId,
+      });
+
+      await db
+        .update(deletionTombstones)
+        .set({
+          auditMetadata,
+          lastCompletedStep: DELETION_STEPS.AUDIT_TERMINAL,
+          status: "audit_terminal",
+        })
+        .where(eq(deletionTombstones.id, payload.tombstoneId));
+
+      await deps.enqueueDeletionJob("deletion.postgres_purge", payload);
+    },
+
+    async processPostgresPurge(payload: DeletionEnqueuePayload): Promise<void> {
+      const [tombstone] = await db
+        .select()
+        .from(deletionTombstones)
+        .where(eq(deletionTombstones.id, payload.tombstoneId))
+        .limit(1);
+
+      if (!tombstone || tombstone.organizationId !== payload.organizationId) {
+        throw new ServiceError("NOT_FOUND", "Deletion tombstone not found.");
+      }
+
+      if (tombstone.status === "complete") {
+        return;
+      }
+
+      if (stepRank(tombstone.lastCompletedStep) >= stepRank(DELETION_STEPS.POSTGRES_PURGE)) {
+        return;
+      }
+
+      if (stepRank(tombstone.lastCompletedStep) < stepRank(DELETION_STEPS.AUDIT_TERMINAL)) {
+        throw new ServiceError(
+          "VALIDATION_ERROR",
+          "Postgres purge cannot run before audit terminal completes."
+        );
+      }
+
+      const organizationId = payload.organizationId;
+      const projectRows = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.organizationId, organizationId));
+      const projectIds = projectRows.map((row) => row.id);
+
+      const reportRows =
+        projectIds.length === 0
+          ? []
+          : await db
+              .select({ id: reports.id })
+              .from(reports)
+              .where(eq(reports.organizationId, organizationId));
+      const reportIds = reportRows.map((row) => row.id);
+
+      await db
+        .delete(integrationOperations)
+        .where(eq(integrationOperations.organizationId, organizationId));
+
+      await db
+        .delete(reportComments)
+        .where(eq(reportComments.organizationId, organizationId));
+
+      if (reportIds.length > 0) {
+        await db.delete(reportBlobs).where(inArray(reportBlobs.reportId, reportIds));
+        await db.delete(reports).where(eq(reports.organizationId, organizationId));
+      }
+
+      if (projectIds.length > 0) {
+        await db.delete(projects).where(eq(projects.organizationId, organizationId));
+      }
+
+      await db.delete(integrations).where(eq(integrations.organizationId, organizationId));
+
+      const endpointRows = await db
+        .select({ id: webhookEndpoints.id })
+        .from(webhookEndpoints)
+        .where(eq(webhookEndpoints.organizationId, organizationId));
+      const endpointIds = endpointRows.map((row) => row.id);
+      if (endpointIds.length > 0) {
+        await db
+          .delete(webhookDeliveries)
+          .where(inArray(webhookDeliveries.endpointId, endpointIds));
+      }
+      await db
+        .delete(webhookEndpoints)
+        .where(eq(webhookEndpoints.organizationId, organizationId));
+
+      await db
+        .delete(workspaceApiKeys)
+        .where(eq(workspaceApiKeys.organizationId, organizationId));
+
+      await db
+        .delete(workspaceUsageMonthly)
+        .where(eq(workspaceUsageMonthly.organizationId, organizationId));
+
+      await db.delete(organization).where(eq(organization.id, organizationId));
+
+      await db
+        .update(auditLog)
+        .set({ organizationId: null })
+        .where(eq(auditLog.organizationId, organizationId));
+
+      await sendDeletionLifecycleEmail({
+        organizationSlug: tombstone.organizationSlug,
+        ownerEmail: tombstone.ownerEmail,
+        phase: "complete",
+      });
+
+      await db
+        .update(deletionTombstones)
+        .set({
+          completedAt: new Date(),
+          lastCompletedStep: DELETION_STEPS.POSTGRES_PURGE,
+          status: "complete",
+        })
+        .where(eq(deletionTombstones.id, payload.tombstoneId));
     },
 
     revokeWorkspaceAccess,

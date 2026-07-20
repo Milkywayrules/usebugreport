@@ -6,6 +6,7 @@ import {
   apikey,
   commentAuthorTypeEnum,
   deletionTombstoneStatusEnum,
+  auditLog,
   deletionTombstones,
   ingestKeys,
   ingestKeysRelations,

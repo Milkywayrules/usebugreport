@@ -8,3 +8,4 @@ export * from "./integrations";
 export * from "./integration-operations";
 export * from "./webhooks";
 export * from "./deletion";
+export * from "./audit";
