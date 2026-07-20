@@ -35,6 +35,7 @@ import { registerApiKeyRoutes } from "./routes/api-keys";
 import { registerCaptureRoutes } from "./routes/capture";
 import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
+import { registerReportRoutes } from "./routes/reports";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWorkspaceRoutes } from "./routes/workspaces";
 
@@ -262,10 +263,12 @@ const baseApp = new Elysia()
   );
 
 const appWithRoutes = registerCaptureRoutes(
-  registerApiKeyRoutes(
-    registerUserPreferenceRoutes(
-      registerProjectMemberRoutes(
-        registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+  registerReportRoutes(
+    registerApiKeyRoutes(
+      registerUserPreferenceRoutes(
+        registerProjectMemberRoutes(
+          registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+        )
       )
     )
   ),
