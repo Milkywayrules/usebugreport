@@ -14,6 +14,10 @@ import { organization } from "@usebugreport/db";
 
 export const LINEAR_PUSH_ACTION = "linear.push";
 
+export interface PushReportToLinearOptions {
+  retry?: boolean;
+}
+
 export interface LinearPushDeps {
   appUrl: string;
   enqueueLinearPush?: (payload: IntegrationsLinearPushPayload) => Promise<void>;
@@ -250,7 +254,8 @@ export function createLinearPushHandlers(
 
     async pushReportToLinear(
       ctx: AuthContext,
-      reportId: string
+      reportId: string,
+      options: PushReportToLinearOptions = {}
     ): Promise<{
       externalUrl?: string;
       operationId: string;
@@ -307,9 +312,68 @@ export function createLinearPushHandlers(
         if (existing.status === "pending") {
           return { operationId: existing.id, status: "pending" };
         }
+        if (existing.status === "failed") {
+          if (!options.retry) {
+            throw new ServiceError(
+              "CONFLICT",
+              "Linear push previously failed. Explicit retry is required."
+            );
+          }
+
+          const flipped = await db
+            .update(integrationOperations)
+            .set({
+              error: null,
+              status: "pending",
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(integrationOperations.id, existing.id),
+                eq(integrationOperations.status, "failed")
+              )
+            )
+            .returning({ id: integrationOperations.id });
+
+          if (flipped.length === 0) {
+            const again = await readOperationByReport(reportId);
+            if (!again) {
+              throw new ServiceError("CONFLICT", "Linear push retry lost race.");
+            }
+            if (again.status === "succeeded" && again.externalUrl) {
+              return {
+                externalUrl: again.externalUrl,
+                operationId: again.id,
+                status: "succeeded",
+              };
+            }
+            if (again.status === "pending") {
+              return { operationId: again.id, status: "pending" };
+            }
+            throw new ServiceError(
+              "CONFLICT",
+              "Linear push retry conflicted with another attempt."
+            );
+          }
+
+          if (!deps.enqueueLinearPush) {
+            throw new ServiceError(
+              "VALIDATION_ERROR",
+              "Linear push queue is not configured."
+            );
+          }
+
+          await deps.enqueueLinearPush({
+            operationId: existing.id,
+            organizationId: ctx.organizationId,
+            reportId,
+          });
+
+          return { operationId: existing.id, status: "pending" };
+        }
         throw new ServiceError(
           "CONFLICT",
-          "Linear push previously failed. Explicit retry is required."
+          "Linear push is in an unexpected state."
         );
       }
 

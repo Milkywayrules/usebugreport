@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: "2026-07-20 23:15"
+# last_updated: "2026-07-20 24:05"
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 24:00"
+last_updated: "2026-07-20 24:12"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -68,7 +68,7 @@ development_status:
   infra-1-api-platform-hardening-and-billing-mocks: done
   infra-2-shared-telemetry-package: backlog
   1-4-publishable-usebugreport-browser-sdk-package: done
-  epic-3: in-progress  # E3 (launch)
+  epic-3: done  # E3 (launch)
   3-1-web-app-shell-theme-and-route-scaffold: done
   3-3-workspace-switcher-and-pinned-workspaces: done
   2-2-presign-and-complete-ingest-path: done
@@ -97,8 +97,8 @@ development_status:
   epic-7: in-progress  # E7 (launch)
   7-1-linear-oauth-and-integrationservice-config: done
   7-2-outbox-backed-linear-push-worker: done
-  7-3-outbox-pending-and-failed-conflict-branches: backlog
-  3-6-bulk-linear-push: backlog
+  7-3-outbox-pending-and-failed-conflict-branches: done
+  3-6-bulk-linear-push: review
   epic-3-retrospective: optional
   7-4-linear-push-ux-single-palette-and-errors: backlog
   epic-7-retrospective: optional
