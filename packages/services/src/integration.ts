@@ -1,3 +1,6 @@
+import type { IntegrationsLinearPushPayload } from "@usebugreport/queue";
+import { createLinearPushHandlers } from "./integration-linear-push";
+
 import { createHmac } from "node:crypto";
 import type { DbClient } from "@usebugreport/db";
 import { integrations, projects } from "@usebugreport/db";
@@ -22,6 +25,9 @@ export interface IntegrationServiceDeps {
   linearClientId: string;
   linearClientSecret: string;
   usageService: UsageService;
+  enqueueLinearPush?: (
+    payload: IntegrationsLinearPushPayload
+  ) => Promise<void>;
 }
 
 interface LinearIntegrationConfig {
@@ -167,6 +173,12 @@ export function createIntegrationService(
     return tokens.access_token;
   }
 
+  const linearPush = createLinearPushHandlers(db, deps, {
+    ensureFreshAccessToken,
+    rbac,
+    readActiveLinear,
+  });
+
   return {
     async connectLinear(
       ctx: AuthContext,
@@ -292,6 +304,9 @@ export function createIntegrationService(
       };
       return body.data?.teams?.nodes ?? [];
     },
+
+    processLinearPushJob: linearPush.processLinearPushJob,
+    pushReportToLinear: linearPush.pushReportToLinear,
 
     async updateProjectDefaultLinearTeam(
       ctx: AuthContext,
