@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: "2026-07-20 19:05"
+# last_updated: "2026-07-20 20:00"
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -113,19 +113,19 @@ development_status:
   8-3-ssrf-controls-with-ip-pinning-at-delivery: done
   8-4-webhook-debug-ui: done
   epic-8-retrospective: optional
-  epic-9: in-progress  # E9 (launch)
+  epic-9: done  # E9 (launch)
   9-1-deletion-tombstone-enqueue-and-key-revocation: done
   9-2-external-purge-r2-and-redis-before-postgres: done
   9-3-postgres-purge-last-with-idempotent-step-resume: done
   9-4-gdpr-e2e-and-deletion-status-ux: done
   epic-9-retrospective: optional
   # === FAST-FOLLOW (E10-E11, 5 stories) — post LG-1..LG-11 ===
-  epic-10: backlog  # E10 (fast-follow)
-  10-1-rest-and-mcp-create-comment-via-commentservice: backlog
-  10-2-web-thread-attribution-for-agent-comments: backlog
+  epic-10: done  # E10 (fast-follow)
+  10-1-rest-and-mcp-create-comment-via-commentservice: done
+  10-2-web-thread-attribution-for-agent-comments: done
   epic-10-retrospective: optional
-  epic-11: backlog  # E11 (fast-follow)
-  11-1-linear-inbound-status-sync: backlog
+  epic-11: in-progress  # E11 (fast-follow)
+  11-1-linear-inbound-status-sync: done
   11-2-github-issues-outbound-push: backlog
   11-3-report-comment-created-webhook-ff-4: backlog
   epic-11-retrospective: optional
