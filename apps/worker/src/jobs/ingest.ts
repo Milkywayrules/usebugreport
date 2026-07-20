@@ -15,6 +15,7 @@ import {
 } from "@usebugreport/services";
 import { createR2Client } from "@usebugreport/storage";
 import { type Job, Worker } from "bullmq";
+import { resolveWorkerConcurrency } from "../ops/concurrency";
 
 async function listRegisteredWebhooks(
   _organizationId: string
@@ -55,7 +56,7 @@ export function createIngestFinalizeWorker(): Worker {
   });
 
   const connection = createRedisConnection();
-  const concurrency = Math.min(env.WORKER_CONCURRENCY, 10);
+  const concurrency = resolveWorkerConcurrency(env);
 
   return new Worker(
     QUEUE_NAMES.INGEST,

@@ -19,6 +19,13 @@ services:
 
   worker:
     image: usebugreport/worker
+    # Coolify: stop_grace_period 130s — must exceed WORKER_DRAIN_TIMEOUT_MS (120s default)
+    stop_grace_period: 130s
+    mem_limit: 2g
+    mem_reservation: 1g
+    environment:
+      WORKER_CONCURRENCY: "8"
+      WORKER_MEMORY_LIMIT_MB: "2048"
     depends_on:
       - postgres
       - redis
