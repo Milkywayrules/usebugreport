@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 21:30"
+last_updated: "2026-07-20 22:30"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -50,7 +50,7 @@ story_location: "/home/dio--ubuntu/dio/_koding/project/verasic-lab/usebugreport/
 
 development_status:
   # === LAUNCH SCOPE (E1-E9, 48 stories) — dependency execution order ===
-  epic-1: in-progress  # E1 (launch)
+  epic-1: done  # E1 (launch) — all stories complete
   1-1-monorepo-scaffold-and-capture-packages: done
   epic-4: done  # E4 (launch) — all stories complete
   4-1-better-auth-github-oauth-and-session: done
@@ -89,7 +89,7 @@ development_status:
   3-8-human-web-comments-fr-26-lg-2: backlog
   3-9-command-palette-cmd-k: backlog
   epic-6: in-progress  # E6 (launch)
-  6-1-domain-services-and-ad-1-lint-gate: review
+  6-1-domain-services-and-ad-1-lint-gate: done
   6-2-surface-registry-and-route-validation: backlog
   6-3-rest-report-endpoints: backlog
   6-4-rest-parity-contract-tests-real-http: backlog
