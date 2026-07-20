@@ -1,9 +1,17 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import type { DbClient } from "@usebugreport/db";
-import { member, organization, reports, user } from "@usebugreport/db";
+import {
+  member,
+  organization,
+  reportBlobs,
+  reports,
+  user,
+  workspaceUsageMonthly,
+} from "@usebugreport/db";
 import type { IngestFinalizePayload } from "@usebugreport/queue";
 import { eq, sql } from "drizzle-orm";
 import { buildIngestR2Key, createCaptureIngestService } from "./ingest";
+import { createUsageService } from "./usage";
 import { createProjectService } from "./project";
 
 describe("buildIngestR2Key", () => {
@@ -124,6 +132,30 @@ runDbTests("CaptureIngestService", () => {
         }),
       generateId: options?.generateId,
       r2: {
+        getObject: (key) => {
+          if (key.endsWith("/meta.json")) {
+            return Promise.resolve(
+              new TextEncoder().encode(
+                JSON.stringify({
+                  url: "https://app.test/page",
+                  userAgent: "test-agent",
+                  browser: { name: "Chrome", version: "120" },
+                  os: { name: "Linux" },
+                })
+              )
+            );
+          }
+          return Promise.resolve(new Uint8Array([1, 2, 3]));
+        },
+        headObject: (key) =>
+          Promise.resolve({
+            contentLength: key.endsWith("/meta.json") ? 64 : 3,
+            contentType: key.endsWith(".webp")
+              ? "image/webp"
+              : key.endsWith("/meta.json")
+                ? "application/json"
+                : "application/gzip",
+          }),
         presignPut: (key, contentType) =>
           Promise.resolve(
             `https://r2.test/${encodeURIComponent(key)}?contentType=${encodeURIComponent(contentType)}`
@@ -139,6 +171,7 @@ runDbTests("CaptureIngestService", () => {
             return Promise.resolve();
           }),
       },
+      usageService: createUsageService(db),
     });
 
     return { enqueued, putCalls, service };
@@ -371,5 +404,111 @@ runDbTests("CaptureIngestService", () => {
     expect(second.status).toBe("processing");
     expect(putCalls).toHaveLength(4);
     expect(enqueued).toHaveLength(1);
+  });
+
+
+  test("processFinalizeJob writes blobs, completes report, increments usage", async () => {
+    const { service } = createService({ generateId: () => "rpt_finalize_1" });
+    const ctx = {
+      idempotencyKey: "idem-finalize-1",
+      organizationId: orgId,
+      projectId,
+      requestId: "req_test",
+    };
+    const presign = await service.presignUpload(ctx, {
+      parts: [
+        { contentType: "application/gzip", name: "replay", seq: 0 },
+        { contentType: "application/gzip", name: "console" },
+        { contentType: "application/gzip", name: "network" },
+        { contentType: "application/json", name: "meta" },
+      ],
+      title: "Finalize me",
+    });
+
+    const r2Keys = [
+      `${orgId}/${projectId}/${presign.reportId}/replay/batch-0.json.gz`,
+      `${orgId}/${projectId}/${presign.reportId}/console.json.gz`,
+      `${orgId}/${projectId}/${presign.reportId}/network.json.gz`,
+      `${orgId}/${projectId}/${presign.reportId}/meta.json`,
+    ];
+
+    await db
+      .update(reports)
+      .set({ ingestStatus: "processing" })
+      .where(eq(reports.id, presign.reportId));
+
+    const result = await service.processFinalizeJob({
+      idempotencyKey: ctx.idempotencyKey,
+      projectId,
+      r2Keys,
+      reportId: presign.reportId,
+    });
+
+    expect(result.status).toBe("complete");
+
+    const blobs = await db
+      .select()
+      .from(reportBlobs)
+      .where(eq(reportBlobs.reportId, presign.reportId));
+    expect(blobs).toHaveLength(4);
+
+    const [report] = await db
+      .select()
+      .from(reports)
+      .where(eq(reports.id, presign.reportId));
+    expect(report?.ingestStatus).toBe("complete");
+    expect(report?.summaryText).toContain("Finalize me");
+
+    const [usage] = await db
+      .select()
+      .from(workspaceUsageMonthly)
+      .where(eq(workspaceUsageMonthly.organizationId, orgId));
+    expect(usage?.reportCount).toBe(1);
+  });
+
+  test("processFinalizeJob is idempotent when already complete", async () => {
+    const { service } = createService({ generateId: () => "rpt_finalize_2" });
+    const ctx = {
+      idempotencyKey: "idem-finalize-2",
+      organizationId: orgId,
+      projectId,
+      requestId: "req_test",
+    };
+    const presign = await service.presignUpload(ctx, {
+      parts: [{ contentType: "application/json", name: "meta" }],
+      title: "Done",
+    });
+    const r2Keys = [`${orgId}/${projectId}/${presign.reportId}/meta.json`];
+
+    await db
+      .update(reports)
+      .set({ ingestStatus: "processing" })
+      .where(eq(reports.id, presign.reportId));
+
+    await service.processFinalizeJob({
+      idempotencyKey: ctx.idempotencyKey,
+      projectId,
+      r2Keys,
+      reportId: presign.reportId,
+    });
+
+    await service.processFinalizeJob({
+      idempotencyKey: ctx.idempotencyKey,
+      projectId,
+      r2Keys,
+      reportId: presign.reportId,
+    });
+
+    const blobs = await db
+      .select()
+      .from(reportBlobs)
+      .where(eq(reportBlobs.reportId, presign.reportId));
+    expect(blobs).toHaveLength(1);
+
+    const [usage] = await db
+      .select()
+      .from(workspaceUsageMonthly)
+      .where(eq(workspaceUsageMonthly.organizationId, orgId));
+    expect(usage?.reportCount).toBe(1);
   });
 });

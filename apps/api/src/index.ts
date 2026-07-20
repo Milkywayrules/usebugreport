@@ -83,6 +83,7 @@ const captureIngestService = createCaptureIngestService(db, {
     );
   },
   r2: r2Client,
+  usageService,
 });
 
 const baseApp = new Elysia()
