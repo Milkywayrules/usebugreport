@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "drizzle-orm": "^0.38.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "@modelcontextprotocol/sdk": "1.29.0"
   }
 }
