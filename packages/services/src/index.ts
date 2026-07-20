@@ -8,6 +8,11 @@ export {
   requireApiKeyScope,
 } from "./api-key";
 export {
+  createIntegrationService,
+  type IntegrationService,
+  type LinearOAuthTokenSet,
+} from "./integration";
+export {
   createCommentService,
   type CommentService,
   type CreateCommentInput,
