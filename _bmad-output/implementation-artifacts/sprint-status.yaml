@@ -90,7 +90,7 @@ development_status:
   3-9-command-palette-cmd-k: backlog
   epic-6: in-progress  # E6 (launch)
   6-1-domain-services-and-ad-1-lint-gate: done
-  6-2-surface-registry-and-route-validation: backlog
+  6-2-surface-registry-and-route-validation: review
   6-3-rest-report-endpoints: backlog
   6-4-rest-parity-contract-tests-real-http: backlog
   epic-6-retrospective: optional
