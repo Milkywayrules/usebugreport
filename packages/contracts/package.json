@@ -10,10 +10,10 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "bun run scripts/validate-routes.ts && tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "echo 'no tests'",
-    "test:parity": "echo 'parity stub — real HTTP tests in E6-S4'",
+    "test": "bun test scripts",
+    "test:parity": "echo 'parity stub \u2014 real HTTP tests in E6-S4'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check ."
   },

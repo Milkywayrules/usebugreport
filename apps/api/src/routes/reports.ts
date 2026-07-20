@@ -219,6 +219,42 @@ export function registerReportRoutes(
         return handleServiceError(error, authResult.value.requestId);
       }
     })
+    .get("/api/v1/reports/:reportId/summary", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const resolved = await resolveAuthContext(db, authResult.value);
+      if ("error" in resolved) {
+        return jsonResponse(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          403
+        );
+      }
+
+      try {
+        const summary = await reportService.getSummary(
+          resolved,
+          context.params.reportId
+        );
+        return {
+          data: summary,
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    })
+
     .get("/api/v1/reports/:reportId/console-logs", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext

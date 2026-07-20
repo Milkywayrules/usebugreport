@@ -8,6 +8,12 @@ export {
   requireApiKeyScope,
 } from "./api-key";
 export {
+  createCommentService,
+  type CommentService,
+  type CreateCommentInput,
+  type ReportCommentRecord,
+} from "./comment";
+export {
   buildIngestR2Key,
   type CaptureIngestContext,
   type CaptureIngestService,

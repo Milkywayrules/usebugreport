@@ -8,6 +8,7 @@ import { fetchReportDetail } from "@/lib/report-detail/client-api";
 import { ConsolePanel } from "./ConsolePanel";
 import { MetadataPanel } from "./MetadataPanel";
 import { NetworkPanel } from "./NetworkPanel";
+import { CommentsPanel } from "./CommentsPanel";
 import { ReplayViewer } from "./ReplayViewer";
 
 export function ReportDetailView({
@@ -79,6 +80,7 @@ export function ReportDetailView({
           <Tabs.Tab value="console">Console</Tabs.Tab>
           <Tabs.Tab value="network">Network</Tabs.Tab>
           <Tabs.Tab value="metadata">Metadata</Tabs.Tab>
+          <Tabs.Tab value="comments">Comments</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel pt="md" value="replay">
           <ReplayViewer reportId={reportId} />
@@ -91,6 +93,9 @@ export function ReportDetailView({
         </Tabs.Panel>
         <Tabs.Panel pt="md" value="metadata">
           <MetadataPanel report={report} />
+        </Tabs.Panel>
+        <Tabs.Panel pt="md" value="comments">
+          <CommentsPanel reportId={reportId} />
         </Tabs.Panel>
       </Tabs>
     </Stack>

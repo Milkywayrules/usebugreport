@@ -7,6 +7,7 @@ import {
   QUEUE_NAMES,
 } from "@usebugreport/queue";
 import {
+  createCommentService,
   createCaptureIngestService,
   createProjectService,
   createReportService,
@@ -39,6 +40,7 @@ import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
 import { registerReportRoutes } from "./routes/reports";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
+import { registerWebCommentRoutes } from "./routes/web/comments";
 import { registerWorkspaceRoutes } from "./routes/workspaces";
 
 initAuth();
@@ -75,6 +77,7 @@ const r2Client = createR2Client({
   secretAccessKey: env.R2_SECRET_ACCESS_KEY,
 });
 const reportService = createReportService(db, { r2: r2Client });
+const commentService = createCommentService(db);
 const searchService = createSearchService(db);
 const ingestQueue = createQueue(
   QUEUE_NAMES.INGEST,
@@ -266,8 +269,9 @@ const baseApp = new Elysia()
     }
   );
 
-const appWithRoutes = registerCaptureRoutes(
-  registerReportRoutes(
+const appWithRoutes = registerWebCommentRoutes(
+  registerCaptureRoutes(
+    registerReportRoutes(
     registerApiKeyRoutes(
       registerUserPreferenceRoutes(
         registerProjectMemberRoutes(
@@ -275,12 +279,14 @@ const appWithRoutes = registerCaptureRoutes(
         )
       )
     ),
-    { reportService, searchService }
+      { reportService, searchService }
+    ),
+    {
+      captureIngestService,
+      projectService,
+    }
   ),
-  {
-    captureIngestService,
-    projectService,
-  }
+  { commentService }
 ) as typeof baseApp;
 
 const appWithProbes =
