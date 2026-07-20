@@ -193,3 +193,47 @@ export async function fetchReport(
     workspaceSlug,
   };
 }
+
+
+export interface ReportListRow {
+  createdAt: string;
+  id: string;
+  linearIssueUrl: string | null;
+  projectId: string;
+  projectName: string;
+  reporterLabel: string | null;
+  status: "closed" | "duplicate" | "in_progress" | "open" | "resolved";
+  title: string;
+}
+
+export async function fetchReports(input: {
+  cursor?: string;
+  limit?: number;
+  project?: string;
+  q?: string;
+  since?: string;
+  status?: string;
+}) {
+  const params = new URLSearchParams();
+  if (input.status) params.set("status", input.status);
+  if (input.project) params.set("project", input.project);
+  if (input.q) params.set("q", input.q);
+  if (input.since) params.set("since", input.since);
+  if (input.cursor) params.set("cursor", input.cursor);
+  if (input.limit) params.set("limit", String(input.limit));
+
+  const response = await apiFetch(`/api/v1/reports?${params.toString()}`);
+  if (!response.ok) {
+    return {
+      data: [] as ReportListRow[],
+      error: "Unable to load reports.",
+      page: { hasMore: false, nextCursor: null },
+    };
+  }
+
+  const body = (await response.json()) as {
+    data: ReportListRow[];
+    page: { hasMore: boolean; nextCursor: string | null };
+  };
+  return { data: body.data, page: body.page };
+}

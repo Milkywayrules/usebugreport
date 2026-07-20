@@ -35,6 +35,8 @@ export {
   type ReplayManifest,
   type ReplayManifestBatch,
   type ReportRecord,
+  type ListReportsOptions,
+  type ReportListItem,
   type ReportService,
   type ReportServiceDeps,
 } from "./report";
