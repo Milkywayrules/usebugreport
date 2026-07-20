@@ -14,6 +14,7 @@ import {
   requireIdempotencyKey,
   requireIngestKeyAuth,
 } from "../../middleware/ingest-key-auth";
+import { checkIngestKeyRateLimit } from "@usebugreport/queue";
 import {
   InlineIngestParseError,
   parseInlineIngestRequest,
@@ -35,9 +36,55 @@ function jsonResponse(body: unknown, status: number): Response {
 function handleServiceError(error: unknown, requestId: string): Response {
   if (error instanceof ServiceError) {
     const mapped = serviceErrorToHttp(error, requestId);
-    return jsonResponse(mapped.body, mapped.status);
+    const headers: Record<string, string> = {};
+    const resetAt = error.details?.resetAt;
+    if (typeof resetAt === "string") {
+      const seconds = Math.max(
+        1,
+        Math.ceil((Date.parse(resetAt) - Date.now()) / 1000)
+      );
+      headers["Retry-After"] = String(seconds);
+    } else if (typeof error.details?.retryAfterSeconds === "number") {
+      headers["Retry-After"] = String(error.details.retryAfterSeconds);
+    }
+    return new Response(JSON.stringify(mapped.body), {
+      headers: { "Content-Type": "application/json", ...headers },
+      status: mapped.status,
+    });
   }
   throw error;
+}
+
+async function assertIngestRateLimit(
+  request: Request,
+  projectId: string,
+  requestId: string
+): Promise<Response | null> {
+  const ingestKey = request.headers.get("X-Ingest-Key")?.trim();
+  if (!ingestKey) {
+    return null;
+  }
+
+  const result = await checkIngestKeyRateLimit({ ingestKey, projectId });
+  if (result.allowed) {
+    return null;
+  }
+
+  const mapped = serviceErrorToHttp(
+    new ServiceError(
+      "RATE_LIMITED",
+      "Ingest rate limit exceeded for this key.",
+      { retryAfterSeconds: result.retryAfterSeconds ?? 60 }
+    ),
+    requestId
+  );
+  return new Response(JSON.stringify(mapped.body), {
+    headers: {
+      "Content-Type": "application/json",
+      "Retry-After": String(result.retryAfterSeconds ?? 60),
+    },
+    status: mapped.status,
+  });
 }
 
 function parsePresignBody(body: unknown): PresignUploadInput | null {
@@ -126,6 +173,15 @@ export function registerCaptureRoutes(
         return jsonResponse(idempotencyResult.body, idempotencyResult.status);
       }
 
+      const rateLimited = await assertIngestRateLimit(
+        handlerContext.request,
+        authResult.value.projectId,
+        authResult.value.requestId
+      );
+      if (rateLimited) {
+        return rateLimited;
+      }
+
       const body = parsePresignBody(readJsonBody(handlerContext.body));
       if (!body) {
         return jsonResponse(
@@ -174,6 +230,15 @@ export function registerCaptureRoutes(
       );
       if (!idempotencyResult.ok) {
         return jsonResponse(idempotencyResult.body, idempotencyResult.status);
+      }
+
+      const rateLimited = await assertIngestRateLimit(
+        handlerContext.request,
+        authResult.value.projectId,
+        authResult.value.requestId
+      );
+      if (rateLimited) {
+        return rateLimited;
       }
 
       const body = parseCompleteBody(readJsonBody(handlerContext.body));
@@ -229,6 +294,15 @@ export function registerCaptureRoutes(
         );
         if (!idempotencyResult.ok) {
           return jsonResponse(idempotencyResult.body, idempotencyResult.status);
+        }
+
+        const rateLimited = await assertIngestRateLimit(
+          handlerContext.request,
+          authResult.value.projectId,
+          authResult.value.requestId
+        );
+        if (rateLimited) {
+          return rateLimited;
         }
 
         let parsedBody: InlineIngestInput;

@@ -1,6 +1,7 @@
 import { cors } from "@elysiajs/cors";
 import {
   createQueue,
+  getActiveFinalizeCount,
   ingestFinalizePayloadSchema,
   JOB_NAMES,
   QUEUE_NAMES,
@@ -76,6 +77,7 @@ const ingestQueue = createQueue(
   ingestFinalizePayloadSchema
 );
 const captureIngestService = createCaptureIngestService(db, {
+  getActiveFinalizeCount,
   enqueueFinalize: async (payload) => {
     await ingestQueue.add(
       JOB_NAMES.INGEST_FINALIZE,

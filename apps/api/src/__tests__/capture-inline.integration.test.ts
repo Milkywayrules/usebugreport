@@ -310,6 +310,7 @@ runIntegration("capture inline ingest integration", () => {
         `${seeded.organizationId}/${seeded.projectId}/${body.reportId}/replay/batch-0.json.gz`,
         `${seeded.organizationId}/${seeded.projectId}/${body.reportId}/meta.json`,
       ]),
+      organizationId: organization.id,
       reportId: body.reportId,
     });
 
