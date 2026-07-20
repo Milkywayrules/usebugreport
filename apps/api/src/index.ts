@@ -4,12 +4,14 @@ import {
   getActiveFinalizeCount,
   ingestFinalizePayloadSchema,
   integrationsLinearPushPayloadSchema,
+  deletionStepPayloadSchema,
   webhooksDispatchPayloadSchema,
   JOB_NAMES,
   QUEUE_NAMES,
 } from "@usebugreport/queue";
 import {
   createCommentService,
+  createDeletionService,
   createCaptureIngestService,
   createIntegrationService,
   createProjectService,
@@ -50,6 +52,7 @@ import { registerReportRoutes } from "./routes/reports";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWebCommentRoutes } from "./routes/web/comments";
 import { registerWorkspaceRoutes } from "./routes/workspaces";
+import { registerDeletionRoutes } from "./routes/deletion";
 import { registerWebhookRoutes } from "./routes/webhooks";
 import { registerMcpRoutes } from "./mcp/register-mcp-routes";
 
@@ -101,6 +104,19 @@ const webhooksQueue = createQueue(
   QUEUE_NAMES.WEBHOOKS,
   webhooksDispatchPayloadSchema
 );
+
+const deletionQueue = createQueue(
+  QUEUE_NAMES.DELETION,
+  deletionStepPayloadSchema
+);
+const deletionService = createDeletionService(db, {
+  enqueueDeletionJob: async (jobName, payload) => {
+    await deletionQueue.add(jobName, deletionStepPayloadSchema.parse(payload), {
+      jobId: `${payload.tombstoneId}-${jobName}-${Date.now()}`,
+    });
+  },
+});
+
 const webhookService = createWebhookService(db, {
   encryptionKey: env.ENCRYPTION_KEY,
   usageService,
@@ -320,9 +336,12 @@ const appWithRoutes = registerLinearIntegrationRoutes(
       registerUserPreferenceRoutes(
         registerProjectMemberRoutes(
           registerProjectRoutes(
-            registerWebhookRoutes(registerWorkspaceRoutes(appWithMcp), {
+            registerDeletionRoutes(
+              registerWebhookRoutes(registerWorkspaceRoutes(appWithMcp), {
               webhookService,
-            })
+            }),
+            { deletionService }
+          )
           )
         )
       )

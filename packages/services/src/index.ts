@@ -13,6 +13,12 @@ export {
   type LinearOAuthTokenSet,
 } from "./integration";
 export {
+  createDeletionService,
+  DELETION_STEPS,
+  type DeletionService,
+  type DeletionStep,
+} from "./deletion";
+export {
   createCommentService,
   type CommentService,
   type CreateCommentInput,
