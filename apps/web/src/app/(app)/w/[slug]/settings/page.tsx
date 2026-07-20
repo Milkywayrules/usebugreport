@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 
-export default async function WorkspaceRootPage({
+export default async function WorkspaceSettingsHubPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  redirect(`/w/${slug}/reports`);
+  redirect(`/w/${slug}/settings/general`);
 }
