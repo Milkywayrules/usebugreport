@@ -4,6 +4,7 @@ import { z } from "zod";
 export const ingestFinalizePayloadSchema = z
   .object({
     idempotencyKey: z.string(),
+    organizationId: z.string(),
     projectId: z.string(),
     r2Keys: z.array(z.string()),
     reportId: z.string(),

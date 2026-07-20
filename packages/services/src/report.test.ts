@@ -152,6 +152,7 @@ runDbTests("ReportService", () => {
     });
 
     await ingest.processFinalizeJob({
+      organizationId: orgId,
       idempotencyKey: "idem-finalize-report",
       projectId,
       r2Keys: [metaKey, consoleKey, replayKey],

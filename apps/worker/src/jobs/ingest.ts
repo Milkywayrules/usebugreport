@@ -6,6 +6,8 @@ import {
   ingestFinalizePayloadSchema,
   JOB_NAMES,
   QUEUE_NAMES,
+  trackFinalizeJobEnd,
+  trackFinalizeJobStart,
 } from "@usebugreport/queue";
 import {
   createCaptureIngestService,
@@ -62,7 +64,12 @@ export function createIngestFinalizeWorker(): Worker {
         return;
       }
       const payload = ingestFinalizePayloadSchema.parse(job.data);
-      await captureIngestService.processFinalizeJob(payload);
+      await trackFinalizeJobStart(payload.organizationId);
+      try {
+        await captureIngestService.processFinalizeJob(payload);
+      } finally {
+        await trackFinalizeJobEnd(payload.organizationId);
+      }
     },
     {
       concurrency,
