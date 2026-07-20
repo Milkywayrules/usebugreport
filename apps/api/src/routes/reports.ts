@@ -10,6 +10,8 @@ import { serviceErrorToHttp } from "../lib/errors";
 import { INTEGRATION_PUBLIC_TAG } from "../lib/route-tags";
 import { resolveAuthContext } from "../middleware/auth-context";
 import { requireSession } from "../middleware/session";
+import { organization, reportBlobs } from "@usebugreport/db";
+import { and, eq } from "drizzle-orm";
 import { createR2Client } from "@usebugreport/storage";
 
 type SessionHandlerContext = Parameters<typeof requireSession>[0];
@@ -27,6 +29,37 @@ function handleServiceError(error: unknown, requestId: string): Response {
     return jsonResponse(mapped.body, mapped.status);
   }
   throw error;
+}
+
+
+
+async function loadOrganizationMeta(organizationId: string) {
+  const [row] = await db
+    .select({
+      billingTier: organization.billingTier,
+      retentionDaysReplay: organization.retentionDaysReplay,
+      slug: organization.slug,
+    })
+    .from(organization)
+    .where(eq(organization.id, organizationId))
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function replayExpired(reportId: string): Promise<boolean> {
+  const blobs = await db
+    .select({ expiresAt: reportBlobs.expiresAt })
+    .from(reportBlobs)
+    .where(
+      and(eq(reportBlobs.reportId, reportId), eq(reportBlobs.type, "replay"))
+    );
+
+  if (blobs.length === 0) {
+    return true;
+  }
+  const now = new Date();
+  return blobs.every((blob) => blob.expiresAt && blob.expiresAt < now);
 }
 
 function parseSince(value: string | null): Date | undefined {
@@ -120,6 +153,167 @@ export function registerReportRoutes(app: unknown): unknown {
         },
       }
     )
+
+    .get("/api/v1/reports/:reportId", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const resolved = await resolveAuthContext(db, authResult.value);
+      if ("error" in resolved) {
+        return jsonResponse(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          403
+        );
+      }
+
+      try {
+        const report = await reportService.getById(
+          resolved,
+          context.params.reportId
+        );
+        const org = await loadOrganizationMeta(report.organizationId);
+
+        return {
+          data: {
+            ...report,
+            billingTier: org?.billingTier ?? "free",
+            createdAt: report.createdAt.toISOString(),
+            retentionDaysReplay: org?.retentionDaysReplay ?? 7,
+            updatedAt: report.updatedAt.toISOString(),
+            workspaceSlug: org?.slug ?? null,
+          },
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    })
+    .get("/api/v1/reports/:reportId/replay-manifest", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const resolved = await resolveAuthContext(db, authResult.value);
+      if ("error" in resolved) {
+        return jsonResponse(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          403
+        );
+      }
+
+      try {
+        const report = await reportService.getById(
+          resolved,
+          context.params.reportId
+        );
+        const org = await loadOrganizationMeta(report.organizationId);
+        const expired = await replayExpired(report.id);
+        const manifest = expired
+          ? { batches: [], screenshotUrl: null }
+          : await reportService.getReplayManifest(resolved, report.id);
+
+        return {
+          data: {
+            billingTier: org?.billingTier ?? "free",
+            manifest,
+            replayExpired: expired,
+            retentionDaysReplay: org?.retentionDaysReplay ?? 7,
+          },
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    })
+    .get("/api/v1/reports/:reportId/console-logs", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const resolved = await resolveAuthContext(db, authResult.value);
+      if ("error" in resolved) {
+        return jsonResponse(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          403
+        );
+      }
+
+      try {
+        const logs = await reportService.getConsoleLogs(
+          resolved,
+          context.params.reportId
+        );
+        return {
+          data: logs,
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    })
+    .get("/api/v1/reports/:reportId/network-requests", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const resolved = await resolveAuthContext(db, authResult.value);
+      if ("error" in resolved) {
+        return jsonResponse(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          403
+        );
+      }
+
+      try {
+        const requests = await reportService.getNetworkRequests(
+          resolved,
+          context.params.reportId
+        );
+        return {
+          data: requests,
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    })
     .get("/api/v1/reports/search", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext
