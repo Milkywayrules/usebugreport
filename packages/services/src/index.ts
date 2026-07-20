@@ -31,6 +31,11 @@ export {
   type ResolvedProjectRole,
 } from "./rbac";
 export {
+  createRetentionService,
+  type RetentionService,
+  type RetentionSweepStats,
+} from "./retention";
+export {
   createReportService,
   type ReplayManifest,
   type ReplayManifestBatch,

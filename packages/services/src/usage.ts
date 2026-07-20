@@ -7,6 +7,9 @@ import {
 import type { DbClient } from "@usebugreport/db";
 import { member, organization, workspaceUsageMonthly } from "@usebugreport/db";
 import { and, eq, sql } from "drizzle-orm";
+import type { R2Client } from "@usebugreport/storage";
+import { createRetentionService } from "./retention";
+import { ServiceError } from "./types";
 import type {
   IncrementOptions,
   MonthlyUsage,
@@ -19,6 +22,7 @@ import type {
 } from "./types";
 
 export interface UsageServiceDeps {
+  r2?: R2Client;
   countIntegrations?: (organizationId: string) => Promise<number>;
   countOwnedWorkspaces?: (userId: string) => Promise<number>;
   getMonthlyReportCount?: (
@@ -270,7 +274,7 @@ export function createUsageService(db: DbClient, deps: UsageServiceDeps = {}) {
       });
   }
 
-  return {
+  const usageService = {
     async checkQuota(ctx: UsageContext): Promise<QuotaCheckResult> {
       const tier = await resolveOrgTier(ctx.organizationId);
       const limits = getTierLimits(tier);
@@ -366,7 +370,28 @@ export function createUsageService(db: DbClient, deps: UsageServiceDeps = {}) {
 
       return { reportCount, yearMonth };
     },
+
+    async recomputeRetention(organizationId: string): Promise<{ updated: number }> {
+      if (!deps.r2) {
+        throw new ServiceError(
+          "VALIDATION_ERROR",
+          "Retention recompute requires R2 configuration."
+        );
+      }
+
+      const retentionService = createRetentionService(db, {
+        getRetentionDays: (orgId) => usageService.getRetentionDays(orgId),
+        r2: deps.r2,
+      });
+
+      const updated =
+        await retentionService.recomputeBlobExpiry(organizationId);
+      return { updated };
+    },
+
   };
+
+  return usageService;
 }
 
 export type UsageService = ReturnType<typeof createUsageService>;
