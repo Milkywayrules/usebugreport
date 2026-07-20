@@ -1,19 +1,22 @@
-/** Re-export for E1-S4; snapshot export lives in capture-core. */
+export { dispose } from "./dispose";
+export { init } from "./init";
+export { submit } from "./submit";
 export {
-  type AssembleSubmitPayloadOptions,
-  assembleSubmitPayload,
-  type BufferSnapshot,
-  CAPTURE_CORE_VERSION,
-  type CaptureCoreConfig,
-  type CaptureSubmitPayload,
-  collectEnvironmentMetadata,
-  createRecorder,
-  type EnvironmentMetadata,
-  exportBufferSnapshot,
-  type Recorder,
-  registerMetadataProvider,
-  resolveBufferSeconds,
-} from "@usebugreport/capture-core";
+  type SubmitOptions,
+  type SubmitResult,
+  UseBugReportConfigError,
+  type UseBugReportInitOptions,
+  UseBugReportNotInitializedError,
+} from "./types";
 
-/** SDK public API placeholder — init/submit in E1-S4. */
-export const SDK_VERSION = "0.0.0-stub";
+import { dispose } from "./dispose";
+import { init } from "./init";
+import { submit } from "./submit";
+
+export const SDK_VERSION = "0.1.0";
+
+export const useBugReport = {
+  dispose,
+  init,
+  submit,
+};

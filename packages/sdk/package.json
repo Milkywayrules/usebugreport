@@ -1,18 +1,29 @@
 {
   "name": "@usebugreport/browser",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Browser SDK for usebugreport session capture and bug report submit",
   "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
   },
+  "keywords": [
+    "bug-report",
+    "session-replay",
+    "rrweb",
+    "usebugreport"
+  ],
+  "license": "UNLICENSED",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "bun test",
+    "test": "bun test --preload ./src/test/preload.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check ."
   },
@@ -20,6 +31,8 @@
     "@usebugreport/capture-core": "workspace:*"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.11.0",
+    "happy-dom": "^20.11.0",
     "typescript": "^5.8.0"
   }
 }
