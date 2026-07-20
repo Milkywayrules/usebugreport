@@ -18,3 +18,11 @@ you can set them up as packages if it is complex enough / reusability concern / 
 propose what you havent implemented from those points to my right-hand for approval.
 
 6. always reindex @AGENTS.md periodically. (like 10 minutes or per epic).
+
+7. force to fully setup & configured.
+
+no need to handle empty / unconfigured (like github oauth, r2, and others), just stop OR continue.
+
+stop if it is mandatory for user/human to provide it NOW. continue if it can be defered withouth any extra temporary implementation to pass it.
+
+8. use t3 env for runtime env validations.
