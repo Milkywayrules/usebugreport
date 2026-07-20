@@ -110,10 +110,13 @@ export function useRegisterSpotlightActions({
             label: `Push ${selectionCount} reports to Linear`,
             keywords: ["bulk", "linear"],
           },
-          () =>
-            notifications.show({
-              message: "Bulk Linear push ships with E3-S6 / E7.",
-            })
+          () => {
+            if (bridge.bulkPushLinear) {
+              bridge.bulkPushLinear();
+              return;
+            }
+            notifications.show({ message: "Select reports on the list first." });
+          }
         )
       );
     }
