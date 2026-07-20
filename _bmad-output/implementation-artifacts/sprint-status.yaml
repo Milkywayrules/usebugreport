@@ -97,7 +97,7 @@ development_status:
   epic-7: in-progress  # E7 (launch)
   7-1-linear-oauth-and-integrationservice-config: done
   7-2-outbox-backed-linear-push-worker: done
-  7-3-outbox-pending-and-failed-conflict-branches: backlog
+  7-3-outbox-pending-and-failed-conflict-branches: review
   3-6-bulk-linear-push: backlog
   epic-3-retrospective: optional
   7-4-linear-push-ux-single-palette-and-errors: backlog
