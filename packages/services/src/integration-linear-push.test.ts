@@ -91,9 +91,13 @@ const internals = {
     canPerform: async () => true,
   },
   readActiveLinear: async () => ({
+    config: {},
+    connectedAt: new Date(),
     id: "int_test",
+    oauthTokensEncrypted: "enc_test",
     organizationId: ctx.organizationId,
-    provider: "linear",
+    revokedAt: null,
+    type: "linear" as const,
   }),
 };
 
