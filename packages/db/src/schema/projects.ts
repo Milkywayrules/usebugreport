@@ -2,12 +2,21 @@ import { relations, sql } from "drizzle-orm";
 import {
   index,
   jsonb,
+  pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth";
+
+export const projectRoleEnum = pgEnum("project_role", [
+  "viewer",
+  "reporter",
+  "developer",
+  "admin",
+]);
 
 export const projects = pgTable(
   "projects",
@@ -50,6 +59,23 @@ export const ingestKeys = pgTable(
   ]
 );
 
+export const projectMembers = pgTable(
+  "project_members",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    role: projectRoleEnum("role").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.projectId, table.userId] }),
+    index("project_members_user_id_idx").on(table.userId),
+  ]
+);
+
 export const userPreferences = pgTable("user_preferences", {
   pinnedOrder: jsonb("pinned_order").notNull().default({}),
   pinnedWorkspaceIds: text("pinned_workspace_ids")
@@ -63,9 +89,21 @@ export const userPreferences = pgTable("user_preferences", {
 
 export const projectsRelations = relations(projects, ({ many, one }) => ({
   ingestKeys: many(ingestKeys),
+  members: many(projectMembers),
   organization: one(organization, {
     fields: [projects.organizationId],
     references: [organization.id],
+  }),
+}));
+
+export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectMembers.projectId],
+    references: [projects.id],
+  }),
+  user: one(user, {
+    fields: [projectMembers.userId],
+    references: [user.id],
   }),
 }));
 

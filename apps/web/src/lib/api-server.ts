@@ -79,6 +79,14 @@ export async function fetchProject(projectId: string) {
     return null;
   }
   const body = (await response.json()) as {
+    capabilities: {
+      canDelete: boolean;
+      canManageMembers: boolean;
+      canRotate: boolean;
+      canUpdate: boolean;
+      effectiveRole: string | null;
+      source: string;
+    };
     project: {
       createdAt: string;
       id: string;
@@ -86,5 +94,39 @@ export async function fetchProject(projectId: string) {
       slug: string;
     };
   };
-  return body.project;
+  return body;
+}
+
+export async function fetchProjectMembers(projectId: string) {
+  const response = await apiFetch(`/api/v1/projects/${projectId}/members`);
+  if (!response.ok) {
+    return { data: [] as ProjectMemberRow[] };
+  }
+  const body = (await response.json()) as { data: ProjectMemberRow[] };
+  return body;
+}
+
+export async function fetchWorkspaceMembers(organizationId: string) {
+  const response = await apiFetch(
+    `/api/v1/workspaces/${organizationId}/members`
+  );
+  if (!response.ok) {
+    return { data: [] as WorkspaceMemberRow[] };
+  }
+  const body = (await response.json()) as { data: WorkspaceMemberRow[] };
+  return body;
+}
+
+export interface ProjectMemberRow {
+  email: string;
+  name: string;
+  role: string;
+  userId: string;
+}
+
+export interface WorkspaceMemberRow {
+  email: string;
+  name: string;
+  role: string;
+  userId: string;
 }

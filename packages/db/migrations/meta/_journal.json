@@ -29,6 +29,13 @@
       "when": 1784509540163,
       "tag": "0003_projects_ingest_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784513200000,
+      "tag": "0004_project_members",
+      "breakpoints": true
     }
   ]
 }

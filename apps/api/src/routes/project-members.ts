@@ -1,3 +1,4 @@
+import type { ProjectRole } from "@usebugreport/services";
 import { createProjectService, ServiceError } from "@usebugreport/services";
 import type { Elysia } from "elysia";
 import { db } from "../lib/auth";
@@ -26,12 +27,25 @@ function handleServiceError(error: unknown, requestId: string): Response {
   throw error;
 }
 
-export function registerProjectRoutes(app: unknown): unknown {
+const PROJECT_ROLES: ProjectRole[] = [
+  "viewer",
+  "reporter",
+  "developer",
+  "admin",
+];
+
+function isProjectRole(value: unknown): value is ProjectRole {
+  return (
+    typeof value === "string" && PROJECT_ROLES.includes(value as ProjectRole)
+  );
+}
+
+export function registerProjectMemberRoutes(app: unknown): unknown {
   const routeApp = app as Elysia;
   const projectService = createProjectService(db);
 
   return routeApp
-    .get("/api/v1/projects/:projectId", async (context) => {
+    .get("/api/v1/projects/:projectId/members", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext
       );
@@ -72,25 +86,17 @@ export function registerProjectRoutes(app: unknown): unknown {
           );
         }
 
-        const project = await projectService.getProject(
-          ctx,
-          context.params.projectId
-        );
-        const capabilities = await projectService.getProjectCapabilities(
+        const members = await projectService.listProjectMembers(
           ctx,
           context.params.projectId
         );
 
-        return {
-          capabilities,
-          project,
-          requestId: authResult.value.requestId,
-        };
+        return { data: members, requestId: authResult.value.requestId };
       } catch (error) {
         return handleServiceError(error, authResult.value.requestId);
       }
     })
-    .patch("/api/v1/projects/:projectId", async (context) => {
+    .post("/api/v1/projects/:projectId/members", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext
       );
@@ -112,8 +118,10 @@ export function registerProjectRoutes(app: unknown): unknown {
         );
       }
 
-      const body = readJsonBody<{ name?: string; slug?: string }>(context.body);
-      if (!body) {
+      const body = readJsonBody<{ role?: string; userId?: string }>(
+        context.body
+      );
+      if (!(body?.userId && isProjectRole(body.role))) {
         return jsonResponse(
           {
             error: {
@@ -145,18 +153,88 @@ export function registerProjectRoutes(app: unknown): unknown {
           );
         }
 
-        const project = await projectService.updateProject(
+        const memberRow = await projectService.addProjectMember(
           ctx,
           context.params.projectId,
-          body
+          { role: body.role, userId: body.userId }
         );
 
-        return { project, requestId: authResult.value.requestId };
+        return jsonResponse(
+          { member: memberRow, requestId: authResult.value.requestId },
+          201
+        );
       } catch (error) {
         return handleServiceError(error, authResult.value.requestId);
       }
     })
-    .delete("/api/v1/projects/:projectId", async (context) => {
+    .patch("/api/v1/projects/:projectId/members/:userId", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const organizationId = activeOrganizationId(authResult.value.session);
+      if (!organizationId) {
+        return jsonResponse(
+          serviceErrorToHttp(
+            {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+            },
+            authResult.value.requestId
+          ).body,
+          403
+        );
+      }
+
+      const body = readJsonBody<{ role?: string }>(context.body);
+      if (!isProjectRole(body?.role)) {
+        return jsonResponse(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Invalid request body.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          422
+        );
+      }
+
+      try {
+        const ctx = await resolveAuthContext(
+          db,
+          authResult.value,
+          organizationId
+        );
+        if ("error" in ctx) {
+          return jsonResponse(
+            serviceErrorToHttp(
+              {
+                code: "FORBIDDEN",
+                message: "Active workspace required.",
+              },
+              authResult.value.requestId
+            ).body,
+            403
+          );
+        }
+
+        const memberRow = await projectService.updateProjectMemberRole(
+          ctx,
+          context.params.projectId,
+          context.params.userId,
+          body.role
+        );
+
+        return { member: memberRow, requestId: authResult.value.requestId };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    })
+    .delete("/api/v1/projects/:projectId/members/:userId", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext
       );
@@ -197,67 +275,13 @@ export function registerProjectRoutes(app: unknown): unknown {
           );
         }
 
-        const project = await projectService.deleteProject(
+        await projectService.removeProjectMember(
           ctx,
-          context.params.projectId
+          context.params.projectId,
+          context.params.userId
         );
 
-        return { project, requestId: authResult.value.requestId };
-      } catch (error) {
-        return handleServiceError(error, authResult.value.requestId);
-      }
-    })
-    .post("/api/v1/projects/:projectId/ingest-keys/rotate", async (context) => {
-      const authResult = requireSession(
-        context as unknown as SessionHandlerContext
-      );
-      if (!authResult.ok) {
-        return jsonResponse(authResult.body, authResult.status);
-      }
-
-      const organizationId = activeOrganizationId(authResult.value.session);
-      if (!organizationId) {
-        return jsonResponse(
-          serviceErrorToHttp(
-            {
-              code: "FORBIDDEN",
-              message: "Active workspace required.",
-            },
-            authResult.value.requestId
-          ).body,
-          403
-        );
-      }
-
-      try {
-        const ctx = await resolveAuthContext(
-          db,
-          authResult.value,
-          organizationId
-        );
-        if ("error" in ctx) {
-          return jsonResponse(
-            serviceErrorToHttp(
-              {
-                code: "FORBIDDEN",
-                message: "Active workspace required.",
-              },
-              authResult.value.requestId
-            ).body,
-            403
-          );
-        }
-
-        const result = await projectService.rotateIngestKey(
-          ctx,
-          context.params.projectId
-        );
-
-        return {
-          ingestKeyPlaintext: result.ingestKeyPlaintext,
-          keyPrefix: result.keyPrefix,
-          requestId: authResult.value.requestId,
-        };
+        return new Response(null, { status: 204 });
       } catch (error) {
         return handleServiceError(error, authResult.value.requestId);
       }

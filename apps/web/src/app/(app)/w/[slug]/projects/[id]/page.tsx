@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import {
   ensureActiveOrganization,
   fetchProject,
+  fetchProjectMembers,
+  fetchWorkspaceMembers,
   fetchWorkspaces,
 } from "@/lib/api-server";
 import { ProjectDetail } from "./project-detail";
@@ -22,14 +24,27 @@ export default async function ProjectDetailPage({
 
   await ensureActiveOrganization(workspace.id);
 
-  const project = await fetchProject(id);
-  if (!project) {
+  const projectResult = await fetchProject(id);
+  if (!projectResult) {
     notFound();
   }
 
+  const membersResult = projectResult.capabilities.canManageMembers
+    ? await fetchProjectMembers(id)
+    : { data: [] };
+  const orgMembersResult = projectResult.capabilities.canManageMembers
+    ? await fetchWorkspaceMembers(workspace.id)
+    : { data: [] };
+
   return (
     <Container py="xl">
-      <ProjectDetail project={project} workspaceSlug={slug} />
+      <ProjectDetail
+        capabilities={projectResult.capabilities}
+        members={membersResult.data}
+        orgMembers={orgMembersResult.data}
+        project={projectResult.project}
+        workspaceSlug={slug}
+      />
     </Container>
   );
 }

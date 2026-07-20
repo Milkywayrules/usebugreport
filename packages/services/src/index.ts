@@ -3,11 +3,20 @@ export {
   generatePrefixedId,
   type ProjectService,
 } from "./project";
+export {
+  createRBACService,
+  PROJECT_ROLE_ORDER,
+  type RBACService,
+  type ResolvedProjectRole,
+} from "./rbac";
 export type {
   AuthContext,
   CursorPage,
   IncrementOptions,
   MonthlyUsage,
+  OrgRole,
+  ProjectAction,
+  ProjectRole,
   QuotaCheckResult,
   ResolvedOrgBilling,
   RestWriteLimitType,

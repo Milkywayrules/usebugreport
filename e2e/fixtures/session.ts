@@ -52,6 +52,7 @@ export interface SessionFixture {
 async function truncateAuthTables(db: ReturnType<typeof createDbClient>) {
   await db.execute(sql`
     truncate table
+      project_members,
       ingest_keys,
       projects,
       user_preferences,
@@ -81,6 +82,7 @@ async function signSessionCookie(token: string): Promise<string> {
 export async function createSessionFixture(options?: {
   orgSlug?: string;
   token?: string;
+  userId?: string;
   withOrganization?: boolean;
 }): Promise<SessionFixture> {
   applyTestEnv();
@@ -88,8 +90,8 @@ export async function createSessionFixture(options?: {
   const db = createDbClient(process.env.DATABASE_URL!);
   await truncateAuthTables(db);
 
-  const userId = "user_e2e_gate";
-  const sessionId = "session_e2e_gate";
+  const userId = options?.userId ?? "user_e2e_gate";
+  const sessionId = `session_${userId}`;
   const token = options?.token ?? "session-token-e2e-gate-1234567890";
 
   await db.insert(userTable).values({

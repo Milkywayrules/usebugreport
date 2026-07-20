@@ -46,6 +46,7 @@ runIntegration("workspace and project integration", () => {
   beforeEach(async () => {
     await db.execute(sql`
       truncate table
+        project_members,
         ingest_keys,
         projects,
         user_preferences,
