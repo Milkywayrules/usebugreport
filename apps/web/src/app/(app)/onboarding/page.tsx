@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/lib/auth-server";
-import { createWorkspaceAction } from "./actions";
+import {
+  createWorkspaceAction,
+  fetchFirstReportIdAction,
+} from "./actions";
 import { OnboardingForm } from "./onboarding-form";
 
 export default async function OnboardingPage() {
@@ -10,5 +13,14 @@ export default async function OnboardingPage() {
     redirect("/login");
   }
 
-  return <OnboardingForm createWorkspaceAction={createWorkspaceAction} />;
+  const captureApiBaseUrl =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+  return (
+    <OnboardingForm
+      captureApiBaseUrl={captureApiBaseUrl}
+      createWorkspaceAction={createWorkspaceAction}
+      fetchFirstReportIdAction={fetchFirstReportIdAction}
+    />
+  );
 }

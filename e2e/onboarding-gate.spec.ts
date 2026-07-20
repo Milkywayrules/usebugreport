@@ -86,4 +86,23 @@ test.describe("onboarding gate", () => {
     await expect(page).toHaveURL(/\/onboarding$/);
     await expect(page.getByRole("heading", { name: /welcome/i })).toBeVisible();
   });
+  test("onboarding skip control disabled before workspace create", async ({
+    context,
+    page,
+  }) => {
+    const fixture = await createSessionFixture();
+
+    await context.addCookies([
+      {
+        domain: "127.0.0.1",
+        name: fixture.cookieName,
+        path: "/",
+        value: fixture.cookieValue,
+      },
+    ]);
+
+    await page.goto("/onboarding");
+    await expect(page.getByRole("button", { name: /skip to dashboard/i })).toBeDisabled();
+  });
+
 });

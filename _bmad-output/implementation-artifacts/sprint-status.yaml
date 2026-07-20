@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 19:00"
+last_updated: "2026-07-20 19:25"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -81,7 +81,7 @@ development_status:
   epic-2-retrospective: optional
   1-5-sdk-submit-widget-shadow-dom: done
   epic-1-retrospective: optional
-  3-2-onboarding-wizard: backlog
+  3-2-onboarding-wizard: review
   3-4-dense-report-list-with-keyboard-navigation: done
   3-7-report-detail-and-replay-viewer: backlog
   3-10-central-keyboard-shortcuts-registry: backlog  # AD-10 registry before E3-S9 palette
