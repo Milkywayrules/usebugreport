@@ -16,7 +16,8 @@
     "@usebugreport/services": "workspace:*",
     "bullmq": "^5.40.0",
     "@usebugreport/db": "workspace:*",
-    "@usebugreport/storage": "workspace:*"
+    "@usebugreport/storage": "workspace:*",
+    "@usebugreport/telemetry": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

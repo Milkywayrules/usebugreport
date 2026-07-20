@@ -1,4 +1,5 @@
 import { parseEnv } from "@usebugreport/config";
+import { createServiceLogger, initTelemetry } from "@usebugreport/telemetry";
 import type { Worker } from "bullmq";
 import { createIngestFinalizeWorker } from "./jobs/ingest";
 import { createIntegrationsWorker } from "./jobs/integrations";
@@ -51,6 +52,8 @@ function attachWorkerLogging(worker: Worker): void {
 }
 
 export function bootWorker(): WorkerBundle {
+  createServiceLogger({ service: "usebugreport-worker" });
+  void initTelemetry();
   const env = parseEnv(process.env);
   const ingestConcurrency = resolveWorkerConcurrency(env);
   const rssMb = Math.round(readProcessRssBytes() / (1024 * 1024));

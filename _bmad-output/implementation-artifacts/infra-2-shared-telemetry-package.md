@@ -29,7 +29,7 @@ council_settlement:
 
 # Story infra-2: Shared telemetry package
 
-Status: backlog
+Status: review
 
 <!-- Observability completion — after infra-1, before production ingest; may parallel early E6. Council settlement ratified 2026-07-20 (Sol, Composer, Fable). -->
 

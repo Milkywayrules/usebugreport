@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: "2026-07-20 18:45"
+# last_updated: "2026-07-20 19:05"
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 18:45"
+last_updated: "2026-07-20 19:05"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -66,7 +66,7 @@ development_status:
   1-3-screenshot-and-environment-metadata-at-submit: done
   # === INFRA (harness #2/#5 council-settled) ===
   infra-1-api-platform-hardening-and-billing-mocks: done
-  infra-2-shared-telemetry-package: backlog
+  infra-2-shared-telemetry-package: review
   1-4-publishable-usebugreport-browser-sdk-package: done
   epic-3: done  # E3 (launch)
   3-1-web-app-shell-theme-and-route-scaffold: done
@@ -107,15 +107,15 @@ development_status:
   5-2-mcp-read-tools-from-surface-registry: done
   5-3-mcp-parity-contract-tests-streamable-http: done
   epic-5-retrospective: optional
-  epic-8: in-progress  # E8 (launch)
+  epic-8: done  # E8 (launch)
   8-1-webhook-registration-with-pro-tier-gate: done
   8-2-webhook-dispatch-and-hmac-delivery: done
   8-3-ssrf-controls-with-ip-pinning-at-delivery: done
-  8-4-webhook-debug-ui: backlog
+  8-4-webhook-debug-ui: done
   epic-8-retrospective: optional
-  epic-9: backlog  # E9 (launch)
-  9-1-deletion-tombstone-enqueue-and-key-revocation: backlog
-  9-2-external-purge-r2-and-redis-before-postgres: backlog
+  epic-9: in-progress  # E9 (launch)
+  9-1-deletion-tombstone-enqueue-and-key-revocation: done
+  9-2-external-purge-r2-and-redis-before-postgres: done
   9-3-postgres-purge-last-with-idempotent-step-resume: backlog
   9-4-gdpr-e2e-and-deletion-status-ux: backlog
   epic-9-retrospective: optional
