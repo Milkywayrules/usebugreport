@@ -1,5 +1,6 @@
 import {
   type CaptureIngestService,
+  type InlineIngestInput,
   type PresignPartInput,
   type PresignUploadInput,
   type ProjectService,
@@ -7,11 +8,16 @@ import {
 } from "@usebugreport/services";
 import type { Elysia } from "elysia";
 import { serviceErrorToHttp, validationError } from "../../lib/errors";
+import { observeIngestDuration } from "../../lib/metrics";
 import { readJsonBody } from "../../lib/request-body";
 import {
   requireIdempotencyKey,
   requireIngestKeyAuth,
 } from "../../middleware/ingest-key-auth";
+import {
+  InlineIngestParseError,
+  parseInlineIngestRequest,
+} from "./parse-inline-ingest";
 
 interface CaptureHandlerContext {
   body: unknown;
@@ -190,6 +196,7 @@ export function registerCaptureRoutes(
         );
 
         const durationMs = performance.now() - startedAt;
+        observeIngestDuration("complete", durationMs / 1000);
         return jsonResponse(
           {
             durationMs,
@@ -202,5 +209,70 @@ export function registerCaptureRoutes(
       } catch (error) {
         return handleServiceError(error, authResult.value.requestId);
       }
-    });
+    })
+    .post(
+      "/api/v1/capture/ingest",
+      async (context) => {
+        const handlerContext = context as unknown as CaptureHandlerContext;
+        const startedAt = performance.now();
+        const authResult = await requireIngestKeyAuth(
+          handlerContext,
+          deps.projectService
+        );
+        if (!authResult.ok) {
+          return jsonResponse(authResult.body, authResult.status);
+        }
+
+        const idempotencyResult = requireIdempotencyKey(
+          handlerContext.request,
+          authResult.value.requestId
+        );
+        if (!idempotencyResult.ok) {
+          return jsonResponse(idempotencyResult.body, idempotencyResult.status);
+        }
+
+        let parsedBody: InlineIngestInput;
+        try {
+          parsedBody = await parseInlineIngestRequest(handlerContext.request);
+        } catch (error) {
+          const message =
+            error instanceof InlineIngestParseError
+              ? error.message
+              : "Invalid multipart form data.";
+          return jsonResponse(
+            validationError(message, authResult.value.requestId),
+            422
+          );
+        }
+
+        try {
+          const result = await deps.captureIngestService.acceptInlineIngest(
+            {
+              idempotencyKey: idempotencyResult.value,
+              organizationId: authResult.value.organizationId,
+              projectId: authResult.value.projectId,
+              requestId: authResult.value.requestId,
+            },
+            parsedBody
+          );
+
+          const durationMs = performance.now() - startedAt;
+          observeIngestDuration("inline", durationMs / 1000);
+          return jsonResponse(
+            {
+              durationMs,
+              reportId: result.reportId,
+              requestId: authResult.value.requestId,
+              status: result.status,
+            },
+            202
+          );
+        } catch (error) {
+          return handleServiceError(error, authResult.value.requestId);
+        }
+      },
+      {
+        parse: "none",
+      }
+    );
 }

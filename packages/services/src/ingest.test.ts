@@ -103,8 +103,18 @@ runDbTests("CaptureIngestService", () => {
   function createService(options?: {
     enqueueFinalize?: (payload: IngestFinalizePayload) => Promise<void>;
     generateId?: () => string;
+    putObject?: (
+      key: string,
+      body: Uint8Array,
+      contentType: string
+    ) => Promise<void>;
   }) {
     const enqueued: IngestFinalizePayload[] = [];
+    const putCalls: Array<{
+      contentType: string;
+      key: string;
+      size: number;
+    }> = [];
     const service = createCaptureIngestService(db, {
       enqueueFinalize:
         options?.enqueueFinalize ??
@@ -118,10 +128,20 @@ runDbTests("CaptureIngestService", () => {
           Promise.resolve(
             `https://r2.test/${encodeURIComponent(key)}?contentType=${encodeURIComponent(contentType)}`
           ),
+        putObject:
+          options?.putObject ??
+          ((key, body, contentType) => {
+            putCalls.push({
+              contentType,
+              key,
+              size: body.byteLength,
+            });
+            return Promise.resolve();
+          }),
       },
     });
 
-    return { enqueued, service };
+    return { enqueued, putCalls, service };
   }
 
   test("presign upserts report and returns presigned uploads", async () => {
@@ -215,5 +235,141 @@ runDbTests("CaptureIngestService", () => {
       .from(reports)
       .where(eq(reports.id, presign.reportId));
     expect(report?.ingestStatus).toBe("processing");
+  });
+
+  test("inline ingest uploads parts before enqueue", async () => {
+    const { enqueued, putCalls, service } = createService();
+    const ctx = {
+      idempotencyKey: "idem-inline-1",
+      organizationId: orgId,
+      projectId,
+      requestId: "req_test",
+    };
+    const parts = [
+      {
+        body: new Uint8Array([1, 2, 3]),
+        contentType: "application/gzip",
+        name: "replay" as const,
+        seq: 0,
+      },
+      {
+        body: new Uint8Array([4]),
+        contentType: "application/gzip",
+        name: "console" as const,
+      },
+      {
+        body: new Uint8Array([5]),
+        contentType: "application/gzip",
+        name: "network" as const,
+      },
+      {
+        body: new Uint8Array([6]),
+        contentType: "application/json",
+        name: "meta" as const,
+      },
+    ];
+
+    const result = await service.acceptInlineIngest(ctx, {
+      parts,
+      title: "Inline report",
+    });
+
+    expect(result.status).toBe("processing");
+    expect(putCalls).toHaveLength(4);
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0]?.reportId).toBe(result.reportId);
+    expect(enqueued[0]?.r2Keys).toHaveLength(4);
+
+    const [report] = await db
+      .select({ ingestStatus: reports.ingestStatus })
+      .from(reports)
+      .where(eq(reports.id, result.reportId));
+    expect(report?.ingestStatus).toBe("processing");
+  });
+
+  test("inline ingest rejects payloads over 1 MB", async () => {
+    const { service } = createService();
+    const oversized = new Uint8Array(1_048_577);
+
+    await expect(
+      service.acceptInlineIngest(
+        {
+          idempotencyKey: "idem-inline-oversize",
+          organizationId: orgId,
+          projectId,
+          requestId: "req_test",
+        },
+        {
+          parts: [
+            {
+              body: oversized,
+              contentType: "application/gzip",
+              name: "replay",
+              seq: 0,
+            },
+            {
+              body: new Uint8Array([1]),
+              contentType: "application/gzip",
+              name: "console",
+            },
+            {
+              body: new Uint8Array([1]),
+              contentType: "application/gzip",
+              name: "network",
+            },
+            {
+              body: new Uint8Array([1]),
+              contentType: "application/json",
+              name: "meta",
+            },
+          ],
+        }
+      )
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
+
+  test("inline idempotency skips re-upload when processing", async () => {
+    const { enqueued, putCalls, service } = createService({
+      generateId: () => "rpt_inline_idem",
+    });
+    const ctx = {
+      idempotencyKey: "idem-inline-processing",
+      organizationId: orgId,
+      projectId,
+      requestId: "req_test",
+    };
+    const parts = [
+      {
+        body: new Uint8Array([1]),
+        contentType: "application/gzip",
+        name: "replay" as const,
+        seq: 0,
+      },
+      {
+        body: new Uint8Array([2]),
+        contentType: "application/gzip",
+        name: "console" as const,
+      },
+      {
+        body: new Uint8Array([3]),
+        contentType: "application/gzip",
+        name: "network" as const,
+      },
+      {
+        body: new Uint8Array([4]),
+        contentType: "application/json",
+        name: "meta" as const,
+      },
+    ];
+
+    const first = await service.acceptInlineIngest(ctx, { parts });
+    const second = await service.acceptInlineIngest(ctx, { parts });
+
+    expect(second.reportId).toBe(first.reportId);
+    expect(second.status).toBe("processing");
+    expect(putCalls).toHaveLength(4);
+    expect(enqueued).toHaveLength(1);
   });
 });

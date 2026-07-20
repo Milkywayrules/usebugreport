@@ -12,6 +12,9 @@ export interface R2ClientConfig {
   secretAccessKey: string;
 }
 
+/** Bun-friendly object body for direct R2 uploads (Uint8Array or Node Buffer). */
+export type R2ObjectBody = Uint8Array | Buffer;
+
 export interface R2Client {
   bucket: string;
   client: S3Client;
@@ -21,6 +24,11 @@ export interface R2Client {
     contentType: string,
     expiresInSeconds?: number
   ) => Promise<string>;
+  putObject: (
+    key: string,
+    body: R2ObjectBody,
+    contentType: string
+  ) => Promise<void>;
 }
 
 const DEFAULT_PUT_EXPIRES_SECONDS = 900;
@@ -47,7 +55,26 @@ export function createR2Client(config: R2ClientConfig): R2Client {
       contentType,
       expiresInSeconds = DEFAULT_PUT_EXPIRES_SECONDS
     ) => presignPut(client, config.bucket, key, contentType, expiresInSeconds),
+    putObject: (key, body, contentType) =>
+      putObject(client, config.bucket, key, body, contentType),
   };
+}
+
+export function putObject(
+  client: S3Client,
+  bucket: string,
+  key: string,
+  body: R2ObjectBody,
+  contentType: string
+): Promise<void> {
+  const command = new PutObjectCommand({
+    Body: body,
+    Bucket: bucket,
+    ContentType: contentType,
+    Key: key,
+  });
+
+  return client.send(command).then(() => undefined);
 }
 
 export function presignPut(

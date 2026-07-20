@@ -19,6 +19,7 @@ import { Elysia } from "elysia";
 import { auth, db, initAuth } from "./lib/auth";
 import { getEnv } from "./lib/env";
 import { serviceErrorToHttp } from "./lib/errors";
+import { renderPrometheusMetrics } from "./lib/metrics";
 import { readJsonBody } from "./lib/request-body";
 import { ROUTE_TAGS } from "./lib/route-tags";
 import { apiKeyAuthMiddleware } from "./middleware/api-key-auth";
@@ -77,7 +78,8 @@ const captureIngestService = createCaptureIngestService(db, {
   enqueueFinalize: async (payload) => {
     await ingestQueue.add(
       JOB_NAMES.INGEST_FINALIZE,
-      ingestFinalizePayloadSchema.parse(payload)
+      ingestFinalizePayloadSchema.parse(payload),
+      { jobId: `${payload.projectId}-${payload.idempotencyKey}` }
     );
   },
   r2: r2Client,
@@ -126,6 +128,19 @@ const baseApp = new Elysia()
         };
       }
     },
+    {
+      detail: {
+        hide: true,
+        tags: [ROUTE_TAGS.ops],
+      },
+    }
+  )
+  .get(
+    "/metrics",
+    () =>
+      new Response(renderPrometheusMetrics(), {
+        headers: { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" },
+      }),
     {
       detail: {
         hide: true,
