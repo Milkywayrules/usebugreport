@@ -3,6 +3,13 @@ export {
   createRedisConnection,
   getQueueOptions,
 } from "./connection";
+export {
+  checkIngestKeyRateLimit,
+  getActiveFinalizeCount,
+  trackFinalizeJobEnd,
+  trackFinalizeJobStart,
+  type IngestRateLimitResult,
+} from "./ingest-limits-redis";
 export { JOB_NAMES, type JobName, QUEUE_NAMES, type QueueName } from "./names";
 export {
   type DeletionStepPayload,

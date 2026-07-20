@@ -211,7 +211,8 @@ runIntegration("capture presign and complete integration", () => {
       new Request("http://localhost:3001/api/v1/capture/complete", {
         body: JSON.stringify({
           r2Keys: presignBody.uploads.map((upload) => upload.key),
-          reportId: presignBody.reportId,
+          organizationId: organization.id,
+      reportId: presignBody.reportId,
         }),
         headers: captureHeaders(seeded.ingestKeyPlaintext, idempotencyKey),
         method: "POST",
@@ -234,6 +235,7 @@ runIntegration("capture presign and complete integration", () => {
       idempotencyKey,
       projectId: seeded.projectId,
       r2Keys: presignBody.uploads.map((upload) => upload.key),
+      organizationId: organization.id,
       reportId: presignBody.reportId,
     });
   });

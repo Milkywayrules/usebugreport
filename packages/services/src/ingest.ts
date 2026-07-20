@@ -5,6 +5,10 @@ import type { IngestFinalizePayload } from "@usebugreport/queue";
 import type { R2Client, R2ObjectHead } from "@usebugreport/storage";
 import { and, eq } from "drizzle-orm";
 import { generatePrefixedId } from "./project";
+import {
+  assertFinalizeEnqueueAllowed,
+  assertIngestQuotaAllowed,
+} from "./ingest-limits";
 import { ServiceError } from "./types";
 import type { UsageService } from "./usage";
 
@@ -80,7 +84,11 @@ export interface CaptureIngestServiceDeps {
     organizationId: string
   ) => Promise<Array<{ id: string }>>;
   r2: Pick<R2Client, "getObject" | "headObject" | "presignPut" | "putObject">;
-  usageService: Pick<UsageService, "getRetentionDays" | "increment">;
+  getActiveFinalizeCount?: (organizationId: string) => Promise<number>;
+  usageService: Pick<
+    UsageService,
+    "checkQuota" | "getRetentionDays" | "increment"
+  >;
 }
 
 interface ReportRow {
@@ -457,6 +465,9 @@ export function createCaptureIngestService(
         ctx.projectId,
         ctx.idempotencyKey
       );
+      if (!existing) {
+        await assertIngestQuotaAllowed(deps.usageService, ctx.organizationId);
+      }
       const resolved = await resolveInlineReportId(ctx, input, existing);
       if (resolved.kind === "existing") {
         return {
@@ -467,8 +478,13 @@ export function createCaptureIngestService(
 
       const r2Keys = await uploadInlinePartsToR2(ctx, resolved.reportId, parts);
 
+      await assertFinalizeEnqueueAllowed(
+        deps.getActiveFinalizeCount,
+        ctx.organizationId
+      );
       await deps.enqueueFinalize({
         idempotencyKey: ctx.idempotencyKey,
+        organizationId: ctx.organizationId,
         projectId: ctx.projectId,
         r2Keys,
         reportId: resolved.reportId,
@@ -547,8 +563,13 @@ export function createCaptureIngestService(
           .where(eq(reports.id, reportId));
       }
 
+      await assertFinalizeEnqueueAllowed(
+        deps.getActiveFinalizeCount,
+        ctx.organizationId
+      );
       await deps.enqueueFinalize({
         idempotencyKey: ctx.idempotencyKey,
+        organizationId: ctx.organizationId,
         projectId: ctx.projectId,
         r2Keys: input.r2Keys,
         reportId,
@@ -569,6 +590,7 @@ export function createCaptureIngestService(
       if (existing) {
         reportId = existing.id;
       } else {
+        await assertIngestQuotaAllowed(deps.usageService, ctx.organizationId);
         reportId = generateId();
         try {
           await db.insert(reports).values({

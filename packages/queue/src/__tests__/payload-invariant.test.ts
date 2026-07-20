@@ -23,6 +23,7 @@ describe("queue payload invariant", () => {
 
   test("ingestFinalizePayloadSchema accepts refs-only payload", () => {
     const parsed = ingestFinalizePayloadSchema.parse({
+      organizationId: "org_1",
       idempotencyKey: "idem-1",
       projectId: "prj_test",
       r2Keys: ["org/prj/rpt/replay/batch-1.json.gz"],

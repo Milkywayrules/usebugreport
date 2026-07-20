@@ -263,6 +263,7 @@ runDbTests("CaptureIngestService", () => {
     expect(complete.status).toBe("processing");
     expect(enqueued).toHaveLength(1);
     expect(enqueued[0]).toEqual({
+      organizationId: orgId,
       idempotencyKey: "idem-complete-1",
       projectId,
       r2Keys: [r2Key],
@@ -443,6 +444,7 @@ runDbTests("CaptureIngestService", () => {
       .where(eq(reports.id, presign.reportId));
 
     const result = await service.processFinalizeJob({
+      organizationId: orgId,
       idempotencyKey: ctx.idempotencyKey,
       projectId,
       r2Keys,
@@ -491,6 +493,7 @@ runDbTests("CaptureIngestService", () => {
       .where(eq(reports.id, presign.reportId));
 
     await service.processFinalizeJob({
+      organizationId: orgId,
       idempotencyKey: ctx.idempotencyKey,
       projectId,
       r2Keys,
@@ -498,6 +501,7 @@ runDbTests("CaptureIngestService", () => {
     });
 
     await service.processFinalizeJob({
+      organizationId: orgId,
       idempotencyKey: ctx.idempotencyKey,
       projectId,
       r2Keys,

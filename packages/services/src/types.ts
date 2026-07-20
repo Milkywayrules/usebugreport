@@ -49,7 +49,9 @@ export type ServiceErrorCode =
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
-  | "CONFLICT";
+  | "CONFLICT"
+  | "QUOTA_EXCEEDED"
+  | "RATE_LIMITED";
 
 export class ServiceError extends Error {
   readonly code: ServiceErrorCode;
