@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "bun test src/__tests__",
+    "test": "bun test --preload ./src/__tests__/preload.ts src/__tests__",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check ."
   },
