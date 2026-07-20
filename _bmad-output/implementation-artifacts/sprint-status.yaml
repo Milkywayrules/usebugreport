@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: 2026-07-20 16:55
+# last_updated: 2026-07-20 16:15
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 16:55"
+last_updated: "2026-07-20 16:15"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -72,7 +72,7 @@ development_status:
   3-1-web-app-shell-theme-and-route-scaffold: done
   3-3-workspace-switcher-and-pinned-workspaces: ready-for-dev
   2-2-presign-and-complete-ingest-path: done
-  2-3-inline-ingest-path-with-ack-latency-measurement: ready-for-dev
+  2-3-inline-ingest-path-with-ack-latency-measurement: review
   2-4-ingest-finalize-worker: backlog
   2-5-reportservice-metadata-reads-and-replay-manifest: backlog
   2-6-usage-quotas-and-ingest-rate-limits: backlog

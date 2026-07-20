@@ -1,3 +1,4 @@
+import { INLINE_INGEST_MAX_BYTES } from "@usebugreport/config";
 import type { DbClient } from "@usebugreport/db";
 import { reports } from "@usebugreport/db";
 import type { IngestFinalizePayload } from "@usebugreport/queue";
@@ -33,6 +34,19 @@ export interface PresignUploadInput {
   title?: string;
 }
 
+export interface InlineIngestPart {
+  body: Uint8Array;
+  contentType: string;
+  name: IngestPartName;
+  seq?: number;
+}
+
+export interface InlineIngestInput {
+  description?: string;
+  parts: InlineIngestPart[];
+  title?: string;
+}
+
 export interface CaptureIngestContext {
   idempotencyKey: string;
   organizationId: string;
@@ -43,7 +57,7 @@ export interface CaptureIngestContext {
 export interface CaptureIngestServiceDeps {
   enqueueFinalize: (payload: IngestFinalizePayload) => Promise<void>;
   generateId?: () => string;
-  r2: Pick<R2Client, "presignPut">;
+  r2: Pick<R2Client, "presignPut" | "putObject">;
 }
 
 export function buildIngestR2Key(
@@ -77,29 +91,79 @@ function parsePresignParts(parts: PresignPartInput[]): PresignPartInput[] {
     );
   }
 
-  return parts.map((part) => {
-    if (!INGEST_PART_NAMES.includes(part.name)) {
-      throw new ServiceError("VALIDATION_ERROR", "Invalid upload part name.");
-    }
-    if (!part.contentType?.trim()) {
-      throw new ServiceError("VALIDATION_ERROR", "contentType is required.");
-    }
-    if (
-      part.name === "replay" &&
-      part.seq !== undefined &&
-      (!Number.isInteger(part.seq) || part.seq < 0)
-    ) {
+  return parts.map((part) => parsePresignPart(part));
+}
+
+const INLINE_REQUIRED_PARTS: IngestPartName[] = [
+  "replay",
+  "console",
+  "network",
+  "meta",
+];
+
+function parseInlineParts(parts: InlineIngestPart[]): InlineIngestPart[] {
+  if (!Array.isArray(parts) || parts.length === 0) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "At least one upload part is required."
+    );
+  }
+
+  const parsed = parts.map((part) => {
+    const base = parsePresignPart({
+      contentType: part.contentType,
+      name: part.name,
+      seq: part.seq,
+    });
+    if (!(part.body instanceof Uint8Array) || part.body.byteLength === 0) {
       throw new ServiceError(
         "VALIDATION_ERROR",
-        "Replay seq must be a non-negative integer."
+        "Upload part body is required."
       );
     }
     return {
-      contentType: part.contentType.trim(),
-      name: part.name,
-      seq: part.seq,
+      body: part.body,
+      contentType: base.contentType,
+      name: base.name,
+      seq: base.seq,
     };
   });
+
+  const names = new Set(parsed.map((part) => part.name));
+  for (const required of INLINE_REQUIRED_PARTS) {
+    if (!names.has(required)) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        `Missing required upload part: ${required}.`
+      );
+    }
+  }
+
+  return parsed;
+}
+
+function parsePresignPart(part: PresignPartInput): PresignPartInput {
+  if (!INGEST_PART_NAMES.includes(part.name)) {
+    throw new ServiceError("VALIDATION_ERROR", "Invalid upload part name.");
+  }
+  if (!part.contentType.trim()) {
+    throw new ServiceError("VALIDATION_ERROR", "contentType is required.");
+  }
+  if (
+    part.name === "replay" &&
+    part.seq !== undefined &&
+    (!Number.isInteger(part.seq) || part.seq < 0)
+  ) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "Replay seq must be a non-negative integer."
+    );
+  }
+  return {
+    contentType: part.contentType.trim(),
+    name: part.name,
+    seq: part.seq,
+  };
 }
 
 export function createCaptureIngestService(
@@ -131,7 +195,148 @@ export function createCaptureIngestService(
     return existing ?? null;
   }
 
+  async function resolveInlineReportId(
+    ctx: CaptureIngestContext,
+    input: InlineIngestInput,
+    existing: Awaited<ReturnType<typeof findReportByIdempotency>>
+  ): Promise<
+    | { kind: "existing"; reportId: string; status: "complete" | "processing" }
+    | { kind: "pending"; reportId: string }
+  > {
+    if (
+      existing &&
+      (existing.ingestStatus === "processing" ||
+        existing.ingestStatus === "complete")
+    ) {
+      return {
+        kind: "existing",
+        reportId: existing.id,
+        status: existing.ingestStatus,
+      };
+    }
+
+    if (existing) {
+      return { kind: "pending", reportId: existing.id };
+    }
+
+    const reportId = generateId();
+    try {
+      await db.insert(reports).values({
+        description: input.description?.trim() || null,
+        id: reportId,
+        idempotencyKey: ctx.idempotencyKey,
+        ingestStatus: "pending",
+        organizationId: ctx.organizationId,
+        projectId: ctx.projectId,
+        status: "open",
+        title: input.title?.trim() || "Untitled report",
+      });
+      return { kind: "pending", reportId };
+    } catch (error) {
+      const raced = await findReportByIdempotency(
+        ctx.projectId,
+        ctx.idempotencyKey
+      );
+      if (!raced) {
+        throw error;
+      }
+      if (
+        raced.ingestStatus === "processing" ||
+        raced.ingestStatus === "complete"
+      ) {
+        return {
+          kind: "existing",
+          reportId: raced.id,
+          status: raced.ingestStatus,
+        };
+      }
+      return { kind: "pending", reportId: raced.id };
+    }
+  }
+
+  function uploadInlinePartsToR2(
+    ctx: CaptureIngestContext,
+    reportId: string,
+    parts: InlineIngestPart[]
+  ): Promise<string[]> {
+    const uploads = parts.map((part) => {
+      const key = buildIngestR2Key(
+        ctx.organizationId,
+        ctx.projectId,
+        reportId,
+        part
+      );
+      return deps.r2
+        .putObject(key, part.body, part.contentType)
+        .then(() => key);
+    });
+    return Promise.all(uploads);
+  }
+
   return {
+    async acceptInlineIngest(
+      ctx: CaptureIngestContext,
+      input: InlineIngestInput
+    ) {
+      const parts = parseInlineParts(input.parts);
+      const totalBytes = parts.reduce(
+        (sum, part) => sum + part.body.byteLength,
+        0
+      );
+      if (totalBytes > INLINE_INGEST_MAX_BYTES) {
+        throw new ServiceError(
+          "VALIDATION_ERROR",
+          "Inline ingest limited to 1 MB; use POST /api/v1/capture/presign for larger payloads."
+        );
+      }
+
+      const existing = await findReportByIdempotency(
+        ctx.projectId,
+        ctx.idempotencyKey
+      );
+      const resolved = await resolveInlineReportId(ctx, input, existing);
+      if (resolved.kind === "existing") {
+        return {
+          reportId: resolved.reportId,
+          status: resolved.status,
+        };
+      }
+
+      const r2Keys = await uploadInlinePartsToR2(ctx, resolved.reportId, parts);
+
+      await deps.enqueueFinalize({
+        idempotencyKey: ctx.idempotencyKey,
+        projectId: ctx.projectId,
+        r2Keys,
+        reportId: resolved.reportId,
+      });
+
+      const [claimed] = await db
+        .update(reports)
+        .set({ ingestStatus: "processing" })
+        .where(
+          and(
+            eq(reports.id, resolved.reportId),
+            eq(reports.ingestStatus, "pending")
+          )
+        )
+        .returning({ id: reports.id });
+
+      if (!claimed) {
+        const current = await findReportByIdempotency(
+          ctx.projectId,
+          ctx.idempotencyKey
+        );
+        return {
+          reportId: resolved.reportId,
+          status:
+            current?.ingestStatus === "complete" ? "complete" : "processing",
+        };
+      }
+
+      return { reportId: resolved.reportId, status: "processing" as const };
+    },
+
     async completeIngest(
       ctx: CaptureIngestContext,
       input: { reportId: string; r2Keys: string[] }

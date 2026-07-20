@@ -9,7 +9,7 @@ blocks:
 
 # Story 2.3: Inline ingest path with ack latency measurement
 
-Status: ready-for-dev
+Status: review
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -45,45 +45,45 @@ so that small reports complete quickly without presign round-trips (AD-4).
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — R2 direct upload primitive (AC: 1, 5, 6)
-  - [ ] Extend `packages/storage/src/r2.ts` `R2Client` with `putObject(key, body, contentType)` using `@aws-sdk/client-s3` `PutObjectCommand` (accept `Uint8Array` / `Buffer` / `ReadableStream` — pick one Bun-friendly shape and document)
-  - [ ] Unit test in `packages/storage/src/r2.test.ts` with mocked S3 client (no live R2 required)
-  - [ ] Export unchanged public API surface from `packages/storage/src/index.ts`
+- [x] Task 1 — R2 direct upload primitive (AC: 1, 5, 6)
+  - [x] Extend `packages/storage/src/r2.ts` `R2Client` with `putObject(key, body, contentType)` using `@aws-sdk/client-s3` `PutObjectCommand` (accept `Uint8Array` / `Buffer` / `ReadableStream` — pick one Bun-friendly shape and document)
+  - [x] Unit test in `packages/storage/src/r2.test.ts` with mocked S3 client (no live R2 required)
+  - [x] Export unchanged public API surface from `packages/storage/src/index.ts`
 
-- [ ] Task 2 — Config constants for inline caps (AC: 2, 9)
-  - [ ] Add `packages/config/src/ingest.ts`: `INLINE_INGEST_MAX_BYTES = 1_048_576`, `INLINE_INGEST_ACK_P95_TARGET_MS = 200` (document in comment that target may be raised after measurement — never weaken stream-before-ack)
-  - [ ] Re-export from `packages/config/src/index.ts`
+- [x] Task 2 — Config constants for inline caps (AC: 2, 9)
+  - [x] Add `packages/config/src/ingest.ts`: `INLINE_INGEST_MAX_BYTES = 1_048_576`, `INLINE_INGEST_ACK_P95_TARGET_MS = 200` (document in comment that target may be raised after measurement — never weaken stream-before-ack)
+  - [x] Re-export from `packages/config/src/index.ts`
 
-- [ ] Task 3 — `acceptInlineIngest` service method (AC: 1, 2, 3, 5, 6)
-  - [ ] Extend `CaptureIngestServiceDeps.r2` to `Pick<R2Client, "presignPut" | "putObject">`
-  - [ ] Implement `acceptInlineIngest(ctx, input)` — parse validated parts, size-check, upsert report, `putObject` each part to R2 **before** enqueue, then `enqueueFinalize`
-  - [ ] Idempotency: reuse `findReportByIdempotency`; if existing report `ingest_status` is `processing` or `complete`, return `{ reportId, status }` without re-upload (optional: if `pending` from failed prior attempt, allow overwrite — document choice)
-  - [ ] Unit tests in `packages/services/src/ingest.test.ts` with mocked db/r2/queue
+- [x] Task 3 — `acceptInlineIngest` service method (AC: 1, 2, 3, 5, 6)
+  - [x] Extend `CaptureIngestServiceDeps.r2` to `Pick<R2Client, "presignPut" | "putObject">`
+  - [x] Implement `acceptInlineIngest(ctx, input)` — parse validated parts, size-check, upsert report, `putObject` each part to R2 **before** enqueue, then `enqueueFinalize`
+  - [x] Idempotency: reuse `findReportByIdempotency`; if existing report `ingest_status` is `processing` or `complete`, return `{ reportId, status }` without re-upload (optional: if `pending` from failed prior attempt, allow overwrite — document choice)
+  - [x] Unit tests in `packages/services/src/ingest.test.ts` with mocked db/r2/queue
 
-- [ ] Task 4 — Multipart request parsing helper (AC: 1, 2, 7)
-  - [ ] Create `apps/api/src/routes/capture/parse-inline-ingest.ts` (or colocate in `index.ts` if small) — parse `multipart/form-data` via `request.formData()` with max size guard
-  - [ ] Map form fields to presign-equivalent parts: file fields `replay`, `console`, `network`, `meta`, `screenshot` (optional) + text fields `title`, `description`; replay supports `seq` via field name `replay` with optional `replaySeq` or single batch-0 for v1
-  - [ ] Reject empty parts array, unknown part names, missing required gzip/json content types
+- [x] Task 4 — Multipart request parsing helper (AC: 1, 2, 7)
+  - [x] Create `apps/api/src/routes/capture/parse-inline-ingest.ts` (or colocate in `index.ts` if small) — parse `multipart/form-data` via `request.formData()` with max size guard
+  - [x] Map form fields to presign-equivalent parts: file fields `replay`, `console`, `network`, `meta`, `screenshot` (optional) + text fields `title`, `description`; replay supports `seq` via field name `replay` with optional `replaySeq` or single batch-0 for v1
+  - [x] Reject empty parts array, unknown part names, missing required gzip/json content types
 
-- [ ] Task 5 — HTTP route (AC: 1, 4, 7, 8)
-  - [ ] Add `POST /api/v1/capture/ingest` in `apps/api/src/routes/capture/index.ts`
-  - [ ] Wire ingest-key + idempotency middleware (same as presign/complete)
-  - [ ] Measure `durationMs`; observe `ubr_ingest_duration_seconds{path="inline"}`
+- [x] Task 5 — HTTP route (AC: 1, 4, 7, 8)
+  - [x] Add `POST /api/v1/capture/ingest` in `apps/api/src/routes/capture/index.ts`
+  - [x] Wire ingest-key + idempotency middleware (same as presign/complete)
+  - [x] Measure `durationMs`; observe `ubr_ingest_duration_seconds{path="inline"}`
 
-- [ ] Task 6 — Metrics histogram stub (AC: 8, 9)
-  - [ ] Add minimal Prometheus histogram helper (e.g. `apps/api/src/lib/metrics.ts` or `packages/config/src/metrics.ts`) — `observeIngestDuration(path, seconds)`
-  - [ ] Expose at existing `GET /metrics` route (create if missing — architecture §11); label `path` ∈ `{ inline, complete }` (optional: add complete label in same PR for parity)
-  - [ ] Document measured p95 in story completion notes if integration test logs batch timings
+- [x] Task 6 — Metrics histogram stub (AC: 8, 9)
+  - [x] Add minimal Prometheus histogram helper (e.g. `apps/api/src/lib/metrics.ts` or `packages/config/src/metrics.ts`) — `observeIngestDuration(path, seconds)`
+  - [x] Expose at existing `GET /metrics` route (create if missing — architecture §11); label `path` ∈ `{ inline, complete }` (optional: add complete label in same PR for parity)
+  - [x] Document measured p95 in story completion notes if integration test logs batch timings
 
-- [ ] Task 7 — Integration tests (AC: 10, 11)
-  - [ ] `apps/api/src/__tests__/capture-inline.integration.test.ts` — seed org/project/ingest key, multipart happy path, assert R2 mock puts + Redis job payload
-  - [ ] Test >1 MB → 422 with presign hint in message
-  - [ ] Test idempotency same reportId
-  - [ ] Test revoked key → 401
+- [x] Task 7 — Integration tests (AC: 10, 11)
+  - [x] `apps/api/src/__tests__/capture-inline.integration.test.ts` — seed org/project/ingest key, multipart happy path, assert R2 mock puts + Redis job payload
+  - [x] Test >1 MB → 422 with presign hint in message
+  - [x] Test idempotency same reportId
+  - [x] Test revoked key → 401
 
-- [ ] Task 8 — Verification gate (AC: all)
-  - [ ] Run full verification commands in Testing Requirements
-  - [ ] Confirm presign/complete integration tests still pass (no regressions)
+- [x] Task 8 — Verification gate (AC: all)
+  - [x] Run full verification commands in Testing Requirements
+  - [x] Confirm presign/complete integration tests still pass (no regressions)
 
 ## Dev Notes
 
@@ -385,6 +385,27 @@ bun test packages/storage/src/r2.test.ts
 
 ### Completion Notes List
 
+- Implemented `POST /api/v1/capture/ingest` multipart route with `parse: "none"`, ingest-key auth, ack `durationMs`, and `ubr_ingest_duration_seconds{path="inline"}` histogram at `GET /metrics`.
+- `acceptInlineIngest` streams all parts to R2 before enqueue; BullMQ job dedup via `jobId`; conditional `pending→processing` claim reduces duplicate finalize jobs.
+- Idempotency: `processing`/`complete` returns current status without re-upload; `pending` retries re-upload and re-enqueue.
+- Integration tests mock `@usebugreport/storage`; mocked-R2 inline ack p95 in CI ≪ `INLINE_INGEST_ACK_P95_TARGET_MS` (200ms). Form field names align with future E1-S5 SDK `FormData` contract.
+
 ### File List
 
+- `packages/config/src/ingest.ts`
+- `packages/config/src/index.ts`
+- `packages/storage/src/r2.ts`
+- `packages/storage/src/index.ts`
+- `packages/storage/src/__tests__/r2.test.ts`
+- `packages/services/src/ingest.ts`
+- `packages/services/src/ingest.test.ts`
+- `packages/services/src/index.ts`
+- `apps/api/src/lib/metrics.ts`
+- `apps/api/src/routes/capture/parse-inline-ingest.ts`
+- `apps/api/src/routes/capture/index.ts`
+- `apps/api/src/index.ts`
+- `apps/api/src/__tests__/capture-inline.integration.test.ts`
+
 ### Change Log
+
+- 2026-07-20: E2-S3 inline ingest path — R2 putObject, multipart route, metrics histogram, integration tests.
