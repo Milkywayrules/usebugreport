@@ -1,5 +1,6 @@
 import type { IntegrationsLinearPushPayload } from "@usebugreport/queue";
 import { createLinearInboundHandlers } from "./integration-linear-inbound";
+import { createGitHubPushHandlers } from "./integration-github-push";
 import { createLinearPushHandlers } from "./integration-linear-push";
 
 import { createHmac } from "node:crypto";
@@ -13,6 +14,12 @@ import type { AuthContext } from "./types";
 import { requireSessionUserId, ServiceError } from "./types";
 import type { UsageService } from "./usage";
 
+export interface GitHubOAuthTokenSet {
+  access_token: string;
+  scope?: string;
+  token_type?: string;
+}
+
 export interface LinearOAuthTokenSet {
   access_token: string;
   expires_in?: number;
@@ -23,9 +30,14 @@ export interface LinearOAuthTokenSet {
 export interface IntegrationServiceDeps {
   appUrl: string;
   encryptionKey: string;
+  githubClientId: string;
+  githubClientSecret: string;
   linearClientId: string;
   linearClientSecret: string;
   usageService: UsageService;
+  enqueueGitHubPush?: (
+    payload: IntegrationsLinearPushPayload
+  ) => Promise<void>;
   enqueueLinearPush?: (
     payload: IntegrationsLinearPushPayload
   ) => Promise<void>;
@@ -83,6 +95,34 @@ async function exchangeLinearCode(
   }
 
   return (await response.json()) as LinearOAuthTokenSet;
+}
+
+
+async function exchangeGitHubCode(
+  deps: IntegrationServiceDeps,
+  code: string
+): Promise<GitHubOAuthTokenSet> {
+  const response = await fetch("https://github.com/login/oauth/access_token", {
+    body: new URLSearchParams({
+      client_id: deps.githubClientId,
+      client_secret: deps.githubClientSecret,
+      code,
+    }),
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "GitHub OAuth token exchange failed."
+    );
+  }
+
+  return (await response.json()) as GitHubOAuthTokenSet;
 }
 
 async function refreshLinearToken(
@@ -176,10 +216,30 @@ export function createIntegrationService(
   }
 
   const linearInbound = createLinearInboundHandlers(db);
+  async function readActiveGitHub(organizationId: string) {
+    return db.query.integrations.findFirst({
+      where: and(
+        eq(integrations.organizationId, organizationId),
+        eq(integrations.type, "github"),
+        isNull(integrations.revokedAt)
+      ),
+    });
+  }
+
+  async function ensureGitHubAccessToken(integrationId: string): Promise<string> {
+    const tokens = await loadTokens(integrationId);
+    return tokens.access_token;
+  }
+
   const linearPush = createLinearPushHandlers(db, deps, {
     ensureFreshAccessToken,
     rbac,
     readActiveLinear,
+  });
+  const githubPush = createGitHubPushHandlers(db, deps, {
+    ensureFreshAccessToken: ensureGitHubAccessToken,
+    rbac,
+    readActiveGitHub,
   });
 
   return {
@@ -306,6 +366,128 @@ export function createIntegrationService(
         data?: { teams?: { nodes?: Array<{ id: string; name: string }> } };
       };
       return body.data?.teams?.nodes ?? [];
+    },
+
+
+    async connectGitHub(
+      ctx: AuthContext,
+      input: { code: string; state: string }
+    ): Promise<{ connected: true }> {
+      requireSessionUserId(ctx);
+      const parsed = decodeState<{
+        organizationId: string;
+        userId: string;
+      }>(input.state, deps.encryptionKey);
+      if (
+        parsed.organizationId !== ctx.organizationId ||
+        parsed.userId !== ctx.userId
+      ) {
+        throw new ServiceError("FORBIDDEN", "OAuth state mismatch.");
+      }
+
+      const limit = await deps.usageService.checkTierLimit(ctx, "integrations");
+      if (!limit.allowed) {
+        throw new ServiceError("QUOTA_EXCEEDED", limit.message, limit.details);
+      }
+
+      const existing = await readActiveGitHub(ctx.organizationId);
+      if (existing) {
+        throw new ServiceError("CONFLICT", "GitHub is already connected.");
+      }
+
+      const tokenSet = await exchangeGitHubCode(deps, input.code);
+      const encrypted = await encryptSecret(
+        JSON.stringify(tokenSet),
+        deps.encryptionKey
+      );
+
+      await db.insert(integrations).values({
+        config: {},
+        id: generatePrefixedId("int"),
+        oauthTokensEncrypted: encrypted,
+        organizationId: ctx.organizationId,
+        type: "github",
+      });
+
+      return { connected: true };
+    },
+
+    async disconnectGitHub(ctx: AuthContext): Promise<void> {
+      requireSessionUserId(ctx);
+      const row = await readActiveGitHub(ctx.organizationId);
+      if (!row) {
+        return;
+      }
+
+      await db
+        .update(integrations)
+        .set({ revokedAt: new Date() })
+        .where(eq(integrations.id, row.id));
+    },
+
+    getGitHubAuthorizeUrl(ctx: AuthContext): { state: string; url: string } {
+      requireSessionUserId(ctx);
+      const state = encodeState(
+        {
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+        },
+        deps.encryptionKey
+      );
+      const redirectUri = `${deps.appUrl.replace(/\/$/, "")}/api/v1/integrations/github/callback`;
+      const params = new URLSearchParams({
+        client_id: deps.githubClientId,
+        redirect_uri: redirectUri,
+        scope: "repo",
+        state,
+      });
+      return {
+        state,
+        url: `https://github.com/login/oauth/authorize?${params.toString()}`,
+      };
+    },
+
+    async getGitHubStatus(ctx: AuthContext): Promise<{
+      connected: boolean;
+      connectedAt?: string;
+    }> {
+      const row = await readActiveGitHub(ctx.organizationId);
+      if (!row) {
+        return { connected: false };
+      }
+      return {
+        connected: true,
+        connectedAt: row.connectedAt.toISOString(),
+      };
+    },
+
+    processGitHubPushJob: githubPush.processGitHubPushJob,
+    pushReportToGitHub: githubPush.pushReportToGitHub,
+
+    async updateProjectDefaultGitHubRepo(
+      ctx: AuthContext,
+      projectId: string,
+      repo: string | null
+    ): Promise<void> {
+      requireSessionUserId(ctx);
+      const allowed = await rbac.canPerform(ctx, projectId, "integration:manage");
+      if (!allowed) {
+        throw new ServiceError("FORBIDDEN", "Insufficient project permissions.");
+      }
+      const row = await readActiveGitHub(ctx.organizationId);
+      if (!row) {
+        throw new ServiceError("NOT_FOUND", "GitHub is not connected.");
+      }
+
+      await db
+        .update(projects)
+        .set({ defaultGithubRepo: repo })
+        .where(
+          and(
+            eq(projects.id, projectId),
+            eq(projects.organizationId, ctx.organizationId)
+          )
+        );
     },
 
     handleLinearInboundWebhook: linearInbound.handleWebhook,
