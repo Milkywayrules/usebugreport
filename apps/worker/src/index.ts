@@ -1,11 +1,11 @@
 import { QUEUE_NAMES } from "@usebugreport/queue";
-import { servicesPlaceholder } from "@usebugreport/services";
+import { servicesReady } from "@usebugreport/services";
 
 /** BullMQ consumer stub — job handlers in E2-S4. */
 export function bootWorkerStub() {
   return {
     queues: QUEUE_NAMES,
-    services: servicesPlaceholder,
+    services: servicesReady,
     status: "stub" as const,
   };
 }

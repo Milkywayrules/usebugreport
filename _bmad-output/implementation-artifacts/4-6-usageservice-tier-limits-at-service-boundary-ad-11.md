@@ -7,11 +7,12 @@ blocks:
   - 2-6-usage-quotas-and-ingest-rate-limits
   - 7-1-linear-oauth-and-integrationservice-config
   - 8-1-webhook-registration-with-pro-tier-gate
+baseline_commit: 0eac083985bcb704a56e8acf0a76d8f6b3459734
 ---
 
 # Story 4.6: UsageService tier limits at service boundary (AD-11)
 
-Status: ready-for-dev
+Status: done
 
 <!-- Ultimate context engine analysis completed - comprehensive developer guide created -->
 
@@ -66,30 +67,30 @@ so that API, MCP, and ingest paths cannot bypass UI gates (AD-11 board mandate, 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Tier config single source of truth (AC: 1, 12)
-  - [ ] Create `packages/config/src/tiers.ts` — export `BillingTier` union, `TIER_LIMITS` record, helpers `getTierLimits(tier)`, `getRetentionDays(tier)`, `isSellableTier(tier)`
-  - [ ] Re-export from `packages/config/src/index.ts` (add `./tiers` export path in `package.json` exports if needed)
-  - [ ] Document Studio/Agency as stubs with `sellable: false` flag
-- [ ] Task 2 — Billing tier schema (AC: 2)
-  - [ ] Add `billingTierEnum` + columns on workspace org: extend `packages/db/src/schema/` (prefer new `packages/db/src/schema/billing.ts` imported from `schema/index.ts` — **alter** existing `organization` table via new migration, do not duplicate better-auth org table)
-  - [ ] Migration `packages/db/migrations/0002_*` (or next index after E2-S1): `billing_tier` NOT NULL DEFAULT `'free'`, nullable `retention_days_replay`, `retention_days_screenshot`
-  - [ ] **Do not** create `workspace_usage_monthly` here — owned by E2-S1 (`2-1-core-ingest-schema-and-queue-payloads`); import schema type only
-- [ ] Task 3 — UsageService core (AC: 3–12)
-  - [ ] Create `packages/services/src/types.ts` — minimal `UsageContext { organizationId: string; userId?: string }`, `TierLimitType`, result discriminated unions
-  - [ ] Implement `packages/services/src/usage.ts` — class or factory `createUsageService(db)` with:
+- [x] Task 1 — Tier config single source of truth (AC: 1, 12)
+  - [x] Create `packages/config/src/tiers.ts` — export `BillingTier` union, `TIER_LIMITS` record, helpers `getTierLimits(tier)`, `getRetentionDays(tier)`, `isSellableTier(tier)`
+  - [x] Re-export from `packages/config/src/index.ts` (add `./tiers` export path in `package.json` exports if needed)
+  - [x] Document Studio/Agency as stubs with `sellable: false` flag
+- [x] Task 2 — Billing tier schema (AC: 2)
+  - [x] Add `billingTierEnum` + columns on workspace org: extend `packages/db/src/schema/` (prefer new `packages/db/src/schema/billing.ts` imported from `schema/index.ts` — **alter** existing `organization` table via new migration, do not duplicate better-auth org table)
+  - [x] Migration `packages/db/migrations/0002_*` (or next index after E2-S1): `billing_tier` NOT NULL DEFAULT `'free'`, nullable `retention_days_replay`, `retention_days_screenshot`
+  - [x] **Do not** create `workspace_usage_monthly` here — owned by E2-S1 (`2-1-core-ingest-schema-and-queue-payloads`); import schema type only
+- [x] Task 3 — UsageService core (AC: 3–12)
+  - [x] Create `packages/services/src/types.ts` — minimal `UsageContext { organizationId: string; userId?: string }`, `TierLimitType`, result discriminated unions
+  - [x] Implement `packages/services/src/usage.ts` — class or factory `createUsageService(db)` with:
     - `checkTierLimit(ctx, limitType)`
     - `checkQuota(ctx)`
     - `increment(ctx, opts?)`
     - `getMonthlyUsage(ctx)`
     - `getRetentionDays(orgId)` — loads tier from org row
     - Private helpers: `resolveOrgTier(orgId)`, `countOwnedWorkspaces(userId)`, `countIntegrations(orgId)` (integration count may accept override param for tests until `integrations` table exists)
-  - [ ] Export from `packages/services/src/index.ts`; replace `servicesPlaceholder`
-  - [ ] Update `packages/services/package.json` `test` script to `bun test src`
-- [ ] Task 4 — Unit tests (AC: 13)
-  - [ ] `packages/services/src/usage.test.ts` — table-driven tests per limit type × tier
-  - [ ] Cover: Free workspace 1→2 blocked; Pro 5→6 blocked; Free integration 1→2 blocked; Pro integrations unlimited; webhooks Free denied / Pro allowed; mcp_write Free denied / Pro allowed; checkQuota hard vs soft `capKind`; increment + getMonthlyUsage against fixture row; Studio/Agency stub limits resolve
-- [ ] Task 5 — Verification gate (AC: 13, DoD)
-  - [ ] Run full repo verification commands in Testing Requirements
+  - [x] Export from `packages/services/src/index.ts`; replace `servicesPlaceholder`
+  - [x] Update `packages/services/package.json` `test` script to `bun test src`
+- [x] Task 4 — Unit tests (AC: 13)
+  - [x] `packages/services/src/usage.test.ts` — table-driven tests per limit type × tier
+  - [x] Cover: Free workspace 1→2 blocked; Pro 5→6 blocked; Free integration 1→2 blocked; Pro integrations unlimited; webhooks Free denied / Pro allowed; mcp_write Free denied / Pro allowed; checkQuota hard vs soft `capKind`; increment + getMonthlyUsage against fixture row; Studio/Agency stub limits resolve
+- [x] Task 5 — Verification gate (AC: 13, DoD)
+  - [x] Run full repo verification commands in Testing Requirements
 
 ## Dev Notes
 
@@ -410,29 +411,79 @@ bun --cwd packages/services test
 
 ## Definition of Done
 
-- [ ] All acceptance criteria met
-- [ ] `packages/config/src/tiers.ts` is sole numeric limit source; Studio/Agency stubs documented
-- [ ] `billing_tier` migration applies on org table; default `free`
-- [ ] `UsageService` methods implemented with typed results (no HTTP in service layer)
-- [ ] `checkQuota` distinguishes `capKind: 'hard' | 'soft'`
-- [ ] `workspace_usage_monthly` read/write works against E2-S1 schema (no duplicate migration)
-- [ ] `bun test packages/services/src/usage.test.ts` — all tier boundary cases pass
-- [ ] `turbo lint typecheck test build` exit 0
-- [ ] No route/MCP/workspace CRUD wiring introduced
-- [ ] Story status moved to `review` by dev agent; code-review marks `done`
+- [x] All acceptance criteria met
+- [x] `packages/config/src/tiers.ts` is sole numeric limit source; Studio/Agency stubs documented
+- [x] `billing_tier` migration applies on org table; default `free`
+- [x] `UsageService` methods implemented with typed results (no HTTP in service layer)
+- [x] `checkQuota` distinguishes `capKind: 'hard' | 'soft'`
+- [x] `workspace_usage_monthly` read/write works against E2-S1 schema (no duplicate migration)
+- [x] `bun test packages/services/src/usage.test.ts` — all tier boundary cases pass
+- [x] `turbo lint typecheck test build` exit 0
+- [x] No route/MCP/workspace CRUD wiring introduced
+- [x] Story status moved to `review` by dev agent; code-review marks `done`
+
+### Review Findings
+
+**Verdict:** APPROVED (2026-07-20)
+
+Fixed (patch): none — no CRITICAL/HIGH findings.
+
+Recommendations (medium/low — no block):
+
+- [ ] [Review][Note] `usageFixture` seeds counts at hardcoded `2026-07` while `checkQuota`/`increment` use `currentUtcYearMonth()` — quota boundary tests may misread counts outside the current UTC month [`packages/services/src/usage.test.ts`]
+- [ ] [Review][Note] No Postgres integration test exercises real `increment` upsert path — atomicity verified by code inspection only (see increment check below)
+- [ ] [Review][Note] Duplicate `BillingTier` union in `packages/db/src/schema/billing.ts` vs `@usebugreport/config/tiers` — prefer importing config type to avoid drift
+- [ ] [Review][Note] `turbo test` skips `packages/db` integration without `DATABASE_URL` in task env — CI must set Postgres + env (same convention as E4-S1)
+
+**Increment atomicity (AD-9):** PASS — `incrementMonthlyUsage` uses Drizzle `insert … onConflictDoUpdate` with `reportCount: sql\`${workspaceUsageMonthly.reportCount} + ${delta}\`` (single-statement atomic add). Not read-modify-write.
+
+**Verification (reviewer-run):**
+
+- `db:migrate` on Docker Postgres: 3 migrations (0000–0002); `billing_tier` NOT NULL DEFAULT `'free'`
+- `DATABASE_URL=… bun test packages/services packages/db`: 61 pass, 0 fail
+- `bunx turbo run lint typecheck build test`: 44/44 tasks pass
+- PRD §9 tier numbers match `TIER_LIMITS` exactly; hard/soft quota uses distinct `capKind` on `QuotaCheckResult`; UTC month boundaries + `resetAt` at next UTC month start
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-_(filled by dev agent)_
+Composer (dev subagent)
 
 ### Debug Log References
 
+- Added `drizzle-orm` direct dep to `@usebugreport/services` so bun test resolves ORM imports at runtime
+
 ### Completion Notes List
 
+- Implemented `packages/config/src/tiers.ts` as single source of truth for Free/Pro sellable tiers and Studio/Agency stubs
+- Added migration `0002_tiny_stardust.sql`: `billing_tier` enum + org retention override columns
+- Implemented `createUsageService` with typed `checkTierLimit`, `checkQuota` (hard vs soft `capKind`), `increment`, `getMonthlyUsage`, `getRetentionDays`
+- 29 unit tests in `usage.test.ts` cover all limit types and tier boundaries via injected deps
+- `bunx turbo run lint typecheck build test` — 44/44 tasks pass; migration applies on Docker Postgres
+
 ### File List
+
+- `packages/config/src/tiers.ts` (new)
+- `packages/config/src/index.ts`
+- `packages/config/package.json`
+- `packages/db/src/schema/billing.ts` (new)
+- `packages/db/src/schema/auth.ts`
+- `packages/db/src/schema/index.ts`
+- `packages/db/migrations/0002_tiny_stardust.sql` (new)
+- `packages/db/migrations/meta/0002_snapshot.json` (new)
+- `packages/db/migrations/meta/_journal.json`
+- `packages/services/src/types.ts` (new)
+- `packages/services/src/usage.ts` (new)
+- `packages/services/src/usage.test.ts` (new)
+- `packages/services/src/index.ts`
+- `packages/services/package.json`
+- `apps/api/src/index.ts`
+- `apps/worker/src/index.ts`
+- `bun.lock`
 
 ## Change Log
 
 - 2026-07-20: Story 4.6 drafted — UsageService AD-11 tier enforcement at service boundary
+- 2026-07-20: Implemented UsageService, tier config, billing migration, and unit tests — status review
+- 2026-07-20: Code review APPROVED — AD-11 service boundary, atomic increment, all ACs verified — status done

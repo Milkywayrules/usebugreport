@@ -1,5 +1,5 @@
 import { cors } from "@elysiajs/cors";
-import { servicesPlaceholder } from "@usebugreport/services";
+import { servicesReady } from "@usebugreport/services";
 import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { auth, db, initAuth } from "./lib/auth";
@@ -25,13 +25,13 @@ export const app = new Elysia()
       await db.execute(sql`select 1`);
       return {
         database: "ok",
-        services: servicesPlaceholder,
+        services: servicesReady,
         status: "ok",
       };
     } catch {
       return {
         database: "error",
-        services: servicesPlaceholder,
+        services: servicesReady,
         status: "degraded",
       };
     }

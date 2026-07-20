@@ -8,6 +8,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { billingTierEnum } from "./billing";
 
 export const user = pgTable("user", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -85,11 +86,14 @@ export const verification = pgTable(
 export const organization = pgTable(
   "organization",
   {
+    billingTier: billingTierEnum("billing_tier").default("free").notNull(),
     createdAt: timestamp("created_at").notNull(),
     id: text("id").primaryKey(),
     logo: text("logo"),
     metadata: text("metadata"),
     name: text("name").notNull(),
+    retentionDaysReplay: integer("retention_days_replay"),
+    retentionDaysScreenshot: integer("retention_days_screenshot"),
     slug: text("slug").notNull().unique(),
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]

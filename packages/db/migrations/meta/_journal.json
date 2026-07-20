@@ -15,6 +15,13 @@
       "when": 1784506170737,
       "tag": "0001_breezy_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784506967149,
+      "tag": "0002_tiny_stardust",
+      "breakpoints": true
     }
   ]
 }

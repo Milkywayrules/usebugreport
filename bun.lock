@@ -133,6 +133,7 @@
         "@usebugreport/db": "workspace:*",
         "@usebugreport/queue": "workspace:*",
         "@usebugreport/storage": "workspace:*",
+        "drizzle-orm": "^0.38.0",
       },
       "devDependencies": {
         "typescript": "^5.8.0",

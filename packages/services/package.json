@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "echo 'no tests'",
+    "test": "bun test src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check ."
   },
@@ -21,7 +21,8 @@
     "@usebugreport/contracts": "workspace:*",
     "@usebugreport/db": "workspace:*",
     "@usebugreport/queue": "workspace:*",
-    "@usebugreport/storage": "workspace:*"
+    "@usebugreport/storage": "workspace:*",
+    "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
     "typescript": "^5.8.0"
