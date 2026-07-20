@@ -9,6 +9,8 @@ import {
 import {
   createCaptureIngestService,
   createProjectService,
+  createReportService,
+  createSearchService,
   createUsageService,
   createWorkspaceService,
   ServiceError,
@@ -72,12 +74,13 @@ const r2Client = createR2Client({
   bucket: env.R2_BUCKET,
   secretAccessKey: env.R2_SECRET_ACCESS_KEY,
 });
+const reportService = createReportService(db, { r2: r2Client });
+const searchService = createSearchService(db);
 const ingestQueue = createQueue(
   QUEUE_NAMES.INGEST,
   ingestFinalizePayloadSchema
 );
 const captureIngestService = createCaptureIngestService(db, {
-  getActiveFinalizeCount,
   enqueueFinalize: async (payload) => {
     await ingestQueue.add(
       JOB_NAMES.INGEST_FINALIZE,
@@ -85,6 +88,7 @@ const captureIngestService = createCaptureIngestService(db, {
       { jobId: `${payload.projectId}-${payload.idempotencyKey}` }
     );
   },
+  getActiveFinalizeCount,
   r2: r2Client,
   usageService,
 });
@@ -270,7 +274,8 @@ const appWithRoutes = registerCaptureRoutes(
           registerProjectRoutes(registerWorkspaceRoutes(baseApp))
         )
       )
-    )
+    ),
+    { reportService, searchService }
   ),
   {
     captureIngestService,

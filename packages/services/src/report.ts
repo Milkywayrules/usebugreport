@@ -1,8 +1,7 @@
 import { gunzipSync } from "node:zlib";
 import type { DbClient } from "@usebugreport/db";
-import { reportBlobs, reports } from "@usebugreport/db";
+import { organization, projects, reportBlobs, reports } from "@usebugreport/db";
 import type { R2Client } from "@usebugreport/storage";
-import { projects } from "@usebugreport/db";
 import { and, desc, eq, gte, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { requireApiKeyScope } from "./api-key";
 import { createRBACService } from "./rbac";
@@ -76,7 +75,6 @@ function parseReportStatus(value: unknown): ReportRecord["status"] {
   }
   throw new ServiceError("VALIDATION_ERROR", "Invalid report status.");
 }
-
 
 export interface ListReportsOptions {
   cursor?: string;
@@ -223,6 +221,39 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
       return Array.isArray(parsed) ? parsed : parsed;
     },
 
+    async getOrganizationMeta(
+      ctx: AuthContext,
+      organizationId: string
+    ): Promise<{
+      billingTier: string;
+      retentionDaysReplay: number;
+      slug: string;
+    } | null> {
+      if (organizationId !== ctx.organizationId) {
+        throw new ServiceError("FORBIDDEN", "Organization mismatch.");
+      }
+
+      const [row] = await db
+        .select({
+          billingTier: organization.billingTier,
+          retentionDaysReplay: organization.retentionDaysReplay,
+          slug: organization.slug,
+        })
+        .from(organization)
+        .where(eq(organization.id, organizationId))
+        .limit(1);
+
+      if (!row) {
+        return null;
+      }
+
+      return {
+        billingTier: row.billingTier,
+        retentionDaysReplay: row.retentionDaysReplay ?? 7,
+        slug: row.slug,
+      };
+    },
+
     async getReplayManifest(
       ctx: AuthContext,
       reportId: string
@@ -267,6 +298,52 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
       return { batches, screenshotUrl };
     },
 
+    async getSummary(
+      ctx: AuthContext,
+      reportId: string
+    ): Promise<{
+      reportId: string;
+      summary: Record<string, unknown>;
+      summaryText: string | null;
+    }> {
+      const report = await loadReportRow(ctx, reportId);
+      return {
+        reportId: report.id,
+        summary: report.summary,
+        summaryText: report.summaryText,
+      };
+    },
+
+    async isReplayExpired(
+      ctx: AuthContext,
+      reportId: string
+    ): Promise<boolean> {
+      await loadReportRow(ctx, reportId);
+
+      const blobs = await db
+        .select({ expiresAt: reportBlobs.expiresAt })
+        .from(reportBlobs)
+        .where(
+          and(
+            eq(reportBlobs.reportId, reportId),
+            eq(reportBlobs.type, "replay")
+          )
+        );
+
+      if (blobs.length === 0) {
+        return true;
+      }
+
+      const now = new Date();
+      return blobs.every((blob) => blob.expiresAt && blob.expiresAt < now);
+    },
+
+    async list(
+      ctx: AuthContext,
+      options: ListReportsOptions = {}
+    ): Promise<CursorPage<ReportListItem>> {
+      return this.listReports(ctx, options);
+    },
 
     async listReports(
       ctx: AuthContext,
@@ -286,7 +363,10 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
           "project:read"
         );
         if (!canRead) {
-          throw new ServiceError("FORBIDDEN", "Insufficient project permissions.");
+          throw new ServiceError(
+            "FORBIDDEN",
+            "Insufficient project permissions."
+          );
         }
       }
 
@@ -322,7 +402,10 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
         conditions.push(
           or(
             lt(reports.createdAt, decoded.createdAt),
-            and(eq(reports.createdAt, decoded.createdAt), lt(reports.id, decoded.id))
+            and(
+              eq(reports.createdAt, decoded.createdAt),
+              lt(reports.id, decoded.id)
+            )
           ) ?? sql`true`
         );
       }
@@ -353,9 +436,7 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
         page: {
           hasMore,
           nextCursor:
-            hasMore && last
-              ? encodeListCursor(last.createdAt, last.id)
-              : null,
+            hasMore && last ? encodeListCursor(last.createdAt, last.id) : null,
         },
       };
     },
@@ -422,23 +503,6 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
         status,
         summary: (row.summary ?? {}) as Record<string, unknown>,
         updatedAt,
-      };
-    },
-
-
-    async getSummary(
-      ctx: AuthContext,
-      reportId: string
-    ): Promise<{
-      reportId: string;
-      summary: Record<string, unknown>;
-      summaryText: string | null;
-    }> {
-      const report = await loadReportRow(ctx, reportId);
-      return {
-        reportId: report.id,
-        summary: report.summary,
-        summaryText: report.summaryText,
       };
     },
   };

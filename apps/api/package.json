@@ -6,9 +6,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "bun --watch src/index.ts",
-    "test": "bun test --preload ./src/__tests__/preload.ts $(find src/__tests__ -name '*.test.ts' ! -name 'auth.integration.test.ts')",
+    "test": "bun test --preload ./src/__tests__/preload.ts $(find src/__tests__ -name '*.test.ts' ! -name 'auth.integration.test.ts') && bash scripts/check-ad1-domain-boundary.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "biome check ."
+    "lint": "biome check . && bash scripts/check-ad1-domain-boundary.sh"
   },
   "dependencies": {
     "@better-auth/api-key": "^1.6.23",

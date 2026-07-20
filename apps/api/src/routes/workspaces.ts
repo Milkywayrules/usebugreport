@@ -1,11 +1,9 @@
-import { member, user } from "@usebugreport/db";
 import {
   createProjectService,
   createUsageService,
   createWorkspaceService,
   ServiceError,
 } from "@usebugreport/services";
-import { eq } from "drizzle-orm";
 import type { Elysia } from "elysia";
 import { auth, db } from "../lib/auth";
 import { serviceErrorToHttp } from "../lib/errors";
@@ -205,17 +203,10 @@ export function registerWorkspaceRoutes(app: unknown): unknown {
           organizationId
         );
 
-        const rows = await db
-          .select({
-            email: user.email,
-            name: user.name,
-            role: member.role,
-            userId: member.userId,
-          })
-          .from(member)
-          .innerJoin(user, eq(member.userId, user.id))
-          .where(eq(member.organizationId, organizationId))
-          .orderBy(user.name);
+        const rows = await workspaceService.listMembers(
+          sessionAuthContext(authResult.value, organizationId),
+          organizationId
+        );
 
         return { data: rows, requestId: authResult.value.requestId };
       } catch (error) {

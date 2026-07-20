@@ -1,21 +1,22 @@
 import {
-  createReportService,
-  createSearchService,
+  type ReportService,
+  type SearchService,
   ServiceError,
 } from "@usebugreport/services";
 import type { Elysia } from "elysia";
 import { db } from "../lib/auth";
-import { getEnv } from "../lib/env";
 import { serviceErrorToHttp } from "../lib/errors";
 import { readJsonBody } from "../lib/request-body";
 import { INTEGRATION_PUBLIC_TAG } from "../lib/route-tags";
 import { resolveAuthContext } from "../middleware/auth-context";
 import { requireSession } from "../middleware/session";
-import { organization, reportBlobs } from "@usebugreport/db";
-import { and, eq } from "drizzle-orm";
-import { createR2Client } from "@usebugreport/storage";
 
 type SessionHandlerContext = Parameters<typeof requireSession>[0];
+
+export interface ReportRouteDeps {
+  reportService: ReportService;
+  searchService: SearchService;
+}
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -32,59 +33,23 @@ function handleServiceError(error: unknown, requestId: string): Response {
   throw error;
 }
 
-
-
-async function loadOrganizationMeta(organizationId: string) {
-  const [row] = await db
-    .select({
-      billingTier: organization.billingTier,
-      retentionDaysReplay: organization.retentionDaysReplay,
-      slug: organization.slug,
-    })
-    .from(organization)
-    .where(eq(organization.id, organizationId))
-    .limit(1);
-
-  return row ?? null;
-}
-
-async function replayExpired(reportId: string): Promise<boolean> {
-  const blobs = await db
-    .select({ expiresAt: reportBlobs.expiresAt })
-    .from(reportBlobs)
-    .where(
-      and(eq(reportBlobs.reportId, reportId), eq(reportBlobs.type, "replay"))
-    );
-
-  if (blobs.length === 0) {
-    return true;
-  }
-  const now = new Date();
-  return blobs.every((blob) => blob.expiresAt && blob.expiresAt < now);
-}
-
 function parseSince(value: string | null): Date | undefined {
   if (!value?.trim()) {
-    return undefined;
+    return;
   }
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) {
-    return undefined;
+    return;
   }
   return new Date(parsed);
 }
 
-export function registerReportRoutes(app: unknown): unknown {
+export function registerReportRoutes(
+  app: unknown,
+  deps: ReportRouteDeps
+): unknown {
   const routeApp = app as Elysia;
-  const env = getEnv();
-  const r2 = createR2Client({
-    accessKeyId: env.R2_ACCESS_KEY_ID,
-    accountId: env.R2_ACCOUNT_ID,
-    bucket: env.R2_BUCKET,
-    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-  });
-  const reportService = createReportService(db, { r2 });
-  const searchService = createSearchService(db);
+  const { reportService, searchService } = deps;
 
   return routeApp
     .get(
@@ -182,7 +147,10 @@ export function registerReportRoutes(app: unknown): unknown {
           resolved,
           context.params.reportId
         );
-        const org = await loadOrganizationMeta(report.organizationId);
+        const org = await reportService.getOrganizationMeta(
+          resolved,
+          report.organizationId
+        );
 
         return {
           data: {
@@ -226,8 +194,14 @@ export function registerReportRoutes(app: unknown): unknown {
           resolved,
           context.params.reportId
         );
-        const org = await loadOrganizationMeta(report.organizationId);
-        const expired = await replayExpired(report.id);
+        const org = await reportService.getOrganizationMeta(
+          resolved,
+          report.organizationId
+        );
+        const expired = await reportService.isReplayExpired(
+          resolved,
+          report.id
+        );
         const manifest = expired
           ? { batches: [], screenshotUrl: null }
           : await reportService.getReplayManifest(resolved, report.id);
@@ -355,7 +329,12 @@ export function registerReportRoutes(app: unknown): unknown {
         const report = await reportService.updateStatus(
           resolved,
           context.params.reportId,
-          body.status as "closed" | "duplicate" | "in_progress" | "open" | "resolved"
+          body.status as
+            | "closed"
+            | "duplicate"
+            | "in_progress"
+            | "open"
+            | "resolved"
         );
 
         return {
