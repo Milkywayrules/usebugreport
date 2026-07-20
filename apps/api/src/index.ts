@@ -5,6 +5,7 @@ import {
   ingestFinalizePayloadSchema,
   integrationsLinearPushPayloadSchema,
   deletionStepPayloadSchema,
+  purgeOrganizationRedisKeys,
   webhooksDispatchPayloadSchema,
   JOB_NAMES,
   QUEUE_NAMES,
@@ -110,6 +111,8 @@ const deletionQueue = createQueue(
   deletionStepPayloadSchema
 );
 const deletionService = createDeletionService(db, {
+  purgeOrgRedisKeys: purgeOrganizationRedisKeys,
+  r2: r2Client,
   enqueueDeletionJob: async (jobName, payload) => {
     await deletionQueue.add(jobName, deletionStepPayloadSchema.parse(payload), {
       jobId: `${payload.tombstoneId}-${jobName}-${Date.now()}`,
