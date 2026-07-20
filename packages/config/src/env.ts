@@ -1,8 +1,9 @@
+import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
 const urlSchema = z.string().url();
 
-export const envSchema = z.object({
+const server = {
   API_URL: urlSchema,
   APP_URL: urlSchema,
   BETTER_AUTH_SECRET: z.string().min(1),
@@ -22,10 +23,16 @@ export const envSchema = z.object({
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(8),
   WORKER_DRAIN_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   WORKER_MEMORY_LIMIT_MB: z.coerce.number().int().positive().default(2048),
-});
+};
+
+export const envSchema = z.object(server);
 
 export type Env = z.infer<typeof envSchema>;
 
 export function parseEnv(input: Record<string, string | undefined>): Env {
-  return envSchema.parse(input);
+  return createEnv({
+    emptyStringAsUndefined: true,
+    runtimeEnv: input,
+    server,
+  });
 }

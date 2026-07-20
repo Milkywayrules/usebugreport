@@ -2,7 +2,9 @@
 
 import { headers } from "next/headers";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { env } from "@/env";
+
+const apiUrl = env.NEXT_PUBLIC_API_URL;
 
 async function apiFetch(path: string, init: RequestInit = {}) {
   const requestHeaders = await headers();
