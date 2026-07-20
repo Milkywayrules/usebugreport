@@ -16,3 +16,5 @@
 you can set them up as packages if it is complex enough / reusability concern / other aspects (you decide).
 
 propose what you havent implemented from those points to my right-hand for approval.
+
+6. always reindex @AGENTS.md periodically. (like 10 minutes or per epic).
