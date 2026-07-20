@@ -1,11 +1,19 @@
 import { cors } from "@elysiajs/cors";
 import {
+  createQueue,
+  ingestFinalizePayloadSchema,
+  JOB_NAMES,
+  QUEUE_NAMES,
+} from "@usebugreport/queue";
+import {
+  createCaptureIngestService,
   createProjectService,
   createUsageService,
   createWorkspaceService,
   ServiceError,
   servicesReady,
 } from "@usebugreport/services";
+import { createR2Client } from "@usebugreport/storage";
 import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { auth, db, initAuth } from "./lib/auth";
@@ -16,6 +24,7 @@ import { apiKeyAuthMiddleware } from "./middleware/api-key-auth";
 import { onboardingGateMiddleware } from "./middleware/onboarding-gate";
 import { requireSession, sessionMiddleware } from "./middleware/session";
 import { registerApiKeyRoutes } from "./routes/api-keys";
+import { registerCaptureRoutes } from "./routes/capture";
 import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
@@ -47,11 +56,35 @@ const workspaceService = createWorkspaceService(db, {
   usageService,
 });
 const projectService = createProjectService(db);
+const r2Client = createR2Client({
+  accessKeyId: env.R2_ACCESS_KEY_ID,
+  accountId: env.R2_ACCOUNT_ID,
+  bucket: env.R2_BUCKET,
+  secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+});
+const ingestQueue = createQueue(
+  QUEUE_NAMES.INGEST,
+  ingestFinalizePayloadSchema
+);
+const captureIngestService = createCaptureIngestService(db, {
+  enqueueFinalize: async (payload) => {
+    await ingestQueue.add(
+      JOB_NAMES.INGEST_FINALIZE,
+      ingestFinalizePayloadSchema.parse(payload)
+    );
+  },
+  r2: r2Client,
+});
 
 const baseApp = new Elysia()
   .use(
     cors({
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Ingest-Key",
+        "Idempotency-Key",
+      ],
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       origin: env.APP_URL,
@@ -167,12 +200,18 @@ const baseApp = new Elysia()
     }
   });
 
-const appWithRoutes = registerApiKeyRoutes(
-  registerUserPreferenceRoutes(
-    registerProjectMemberRoutes(
-      registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+const appWithRoutes = registerCaptureRoutes(
+  registerApiKeyRoutes(
+    registerUserPreferenceRoutes(
+      registerProjectMemberRoutes(
+        registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+      )
     )
-  )
+  ),
+  {
+    captureIngestService,
+    projectService,
+  }
 ) as typeof baseApp;
 
 let app = appWithRoutes as typeof baseApp;
