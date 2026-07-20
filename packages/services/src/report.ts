@@ -462,6 +462,7 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
           projectId: reports.projectId,
           status: reports.status,
           summary: reports.summary,
+          linearIssueUrl: reports.linearIssueUrl,
           summaryText: reports.summaryText,
           title: reports.title,
           updatedAt: reports.updatedAt,
