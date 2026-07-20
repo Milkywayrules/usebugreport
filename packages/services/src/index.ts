@@ -30,6 +30,20 @@ export {
   type RBACService,
   type ResolvedProjectRole,
 } from "./rbac";
+export {
+  createReportService,
+  type ReplayManifest,
+  type ReplayManifestBatch,
+  type ReportRecord,
+  type ReportService,
+  type ReportServiceDeps,
+} from "./report";
+export {
+  createSearchService,
+  type SearchReportHit,
+  type SearchReportsOptions,
+  type SearchService,
+} from "./search";
 export type {
   ApiKeyScope,
   AuthContext,
