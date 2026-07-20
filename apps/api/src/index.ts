@@ -3,6 +3,7 @@ import {
   createQueue,
   getActiveFinalizeCount,
   ingestFinalizePayloadSchema,
+  integrationsLinearPushPayloadSchema,
   JOB_NAMES,
   QUEUE_NAMES,
 } from "@usebugreport/queue";
@@ -80,18 +81,29 @@ const r2Client = createR2Client({
 });
 const reportService = createReportService(db, { r2: r2Client });
 const commentService = createCommentService(db);
-const integrationService = createIntegrationService(db, {
-  appUrl: env.APP_URL,
-  encryptionKey: env.ENCRYPTION_KEY,
-  linearClientId: env.LINEAR_CLIENT_ID,
-  linearClientSecret: env.LINEAR_CLIENT_SECRET,
-  usageService,
-});
 const searchService = createSearchService(db);
 const ingestQueue = createQueue(
   QUEUE_NAMES.INGEST,
   ingestFinalizePayloadSchema
 );
+const integrationsQueue = createQueue(
+  QUEUE_NAMES.INTEGRATIONS,
+  integrationsLinearPushPayloadSchema
+);
+const integrationService = createIntegrationService(db, {
+  appUrl: env.APP_URL,
+  encryptionKey: env.ENCRYPTION_KEY,
+  linearClientId: env.LINEAR_CLIENT_ID,
+  linearClientSecret: env.LINEAR_CLIENT_SECRET,
+  enqueueLinearPush: async (payload) => {
+    await integrationsQueue.add(
+      JOB_NAMES.INTEGRATIONS_LINEAR_PUSH,
+      integrationsLinearPushPayloadSchema.parse(payload),
+      { jobId: payload.operationId }
+    );
+  },
+  usageService,
+});
 const captureIngestService = createCaptureIngestService(db, {
   enqueueFinalize: async (payload) => {
     await ingestQueue.add(
