@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 24:05"
+last_updated: "2026-07-20 24:10"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -97,8 +97,8 @@ development_status:
   epic-7: in-progress  # E7 (launch)
   7-1-linear-oauth-and-integrationservice-config: done
   7-2-outbox-backed-linear-push-worker: done
-  7-3-outbox-pending-and-failed-conflict-branches: review
-  3-6-bulk-linear-push: backlog
+  7-3-outbox-pending-and-failed-conflict-branches: done
+  3-6-bulk-linear-push: review
   epic-3-retrospective: optional
   7-4-linear-push-ux-single-palette-and-errors: backlog
   epic-7-retrospective: optional

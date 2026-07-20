@@ -1,6 +1,9 @@
 "use client";
 
 import { notifications } from "@mantine/notifications";
+import { fetchLinearIntegrationConnected } from "@/lib/reports/bulk-linear-push-api";
+import { bulkPushReportsToLinear } from "@/lib/reports/bulk-linear-push";
+import { modals } from "@mantine/modals";
 import {
   Badge,
   Checkbox,
@@ -98,28 +101,64 @@ export function ReportsList({
   const queryClient = useQueryClient();
 
   const selectedIds = useMemo(() => [...selected], [selected]);
-
-  useRegisterSpotlightBridge(
-    {
-      canEdit,
-      patchStatus: async (reportId, status) => {
-        await patchReportStatus(reportId, status);
-        await queryClient.invalidateQueries({ queryKey: ["reports"] });
-      },
-      projects,
-      selectedReportIds: selectedIds,
-      workspaceSlug,
-    },
-    [canEdit, projects, queryClient, selectedIds, workspaceSlug]
-  );
-
-
   const reportsQuery = useQuery({
     queryKey: ["reports", organizationId, queryString.toString()],
     queryFn: () => loadReports(queryString),
   });
 
   const rows = reportsQuery.data?.data ?? [];
+
+  const linearStatusQuery = useQuery({
+    queryKey: ["linear-status", organizationId],
+    queryFn: fetchLinearIntegrationConnected,
+  });
+  const linearConnected = linearStatusQuery.data === true;
+
+  const bulkLinearPushMutation = useMutation({
+    mutationFn: bulkPushReportsToLinear,
+    onSuccess: ({ failed, failedIds, succeeded }) => {
+      if (failed > 0) {
+        notifications.show({
+          color: "yellow",
+          message: `${succeeded} pushed, ${failed} failed (${failedIds.join(", ")})`,
+          title: "Bulk Linear push",
+        });
+      } else {
+        notifications.show({
+          color: "green",
+          message: `${succeeded} report(s) queued for Linear`,
+          title: "Bulk Linear push",
+        });
+      }
+    },
+    onError: () => {
+      notifications.show({
+        color: "red",
+        message: "Bulk Linear push failed.",
+        title: "Bulk Linear push",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+    },
+  });
+
+  const openBulkLinearConfirm = () => {
+    if (!canEdit) return;
+    const targetIds = selected.size > 0 ? [...selected] : [];
+    if (targetIds.length === 0) return;
+    if (!linearConnected) return;
+
+    modals.openConfirmModal({
+      children: `Push ${targetIds.length} report(s) to Linear?`,
+      labels: { cancel: "Cancel", confirm: "Push" },
+      onConfirm: () => {
+        bulkLinearPushMutation.mutate(targetIds);
+      },
+      title: "Push to Linear",
+    });
+  };
+
 
   const applyStatusMutation = useMutation({
     mutationFn: async ({
@@ -191,6 +230,35 @@ export function ReportsList({
     if (targetIds.length === 0) return;
     applyStatusMutation.mutate({ reportIds: targetIds, status });
   };
+
+
+  useRegisterSpotlightBridge(
+    {
+      canEdit,
+      bulkPatchStatus: async (status) => {
+        applyStatusToTargets(status);
+      },
+      bulkPushLinear: () => {
+        openBulkLinearConfirm();
+      },
+      patchStatus: async (reportId, status) => {
+        await patchReportStatus(reportId, status);
+        await queryClient.invalidateQueries({ queryKey: ["reports"] });
+      },
+      projects,
+      selectedReportIds: selectedIds,
+      workspaceSlug,
+    },
+    [
+      canEdit,
+      linearConnected,
+      openBulkLinearConfirm,
+      projects,
+      queryClient,
+      selectedIds,
+      workspaceSlug,
+    ]
+  );
 
 
 
@@ -339,6 +407,14 @@ export function ReportsList({
 
   useHotkeys([
     [
+      "p",
+      (event) => {
+        if (!canEdit || selected.size === 0 || !linearConnected) return;
+        event.preventDefault();
+        openBulkLinearConfirm();
+      },
+    ],
+    [
       GLOBAL_SHORTCUTS.escape.keys,
       (event) => {
         if (selected.size === 0) return;
@@ -444,8 +520,10 @@ export function ReportsList({
         <Text c="dimmed">No reports match these filters.</Text>
       ) : null}
       <BulkStatusBar
+        linearConnected={linearConnected}
         onChangeStatus={applyStatusToTargets}
         onClear={() => setSelected(new Set())}
+        onPushLinear={openBulkLinearConfirm}
         selectedCount={selected.size}
       />
     </Stack>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Affix, Button, Group, Menu, Text } from "@mantine/core";
+import { Affix, Button, Group, Menu, Text, Tooltip } from "@mantine/core";
 import {
   REPORT_STATUS_LABELS,
   REPORT_STATUS_VALUES,
@@ -8,19 +8,35 @@ import {
 } from "@/lib/reports/status";
 
 interface BulkStatusBarProps {
+  linearConnected?: boolean;
   onChangeStatus: (status: ReportStatusValue) => void;
   onClear: () => void;
+  onPushLinear?: () => void;
   selectedCount: number;
 }
 
 export function BulkStatusBar({
+  linearConnected = false,
   onChangeStatus,
   onClear,
+  onPushLinear,
   selectedCount,
 }: BulkStatusBarProps) {
   if (selectedCount <= 0) {
     return null;
   }
+
+  const pushButton = (
+    <Button
+      data-testid="bulk-push-linear"
+      disabled={!linearConnected}
+      onClick={onPushLinear}
+      size="xs"
+      variant="light"
+    >
+      Push to Linear
+    </Button>
+  );
 
   return (
     <Affix
@@ -57,6 +73,11 @@ export function BulkStatusBar({
             ))}
           </Menu.Dropdown>
         </Menu>
+        {linearConnected ? (
+          pushButton
+        ) : (
+          <Tooltip label="Connect Linear in Settings">{pushButton}</Tooltip>
+        )}
         <Button onClick={onClear} size="xs" variant="subtle">
           Clear
         </Button>
