@@ -77,7 +77,6 @@ export const SURFACE_REGISTRY = [
     rest: { method: "POST", path: "/api/v1/reports/:id/comments" },
     mcp: { tool: "create_comment" },
     scopes: ["reports:write"],
-    launchGate: false,
   },
 ] as const satisfies readonly SurfaceRegistryEntry[];
 

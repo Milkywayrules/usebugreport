@@ -49,6 +49,7 @@ import { registerCaptureRoutes } from "./routes/capture";
 import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
 import { registerLinearIntegrationRoutes } from "./routes/integrations/linear";
+import { registerCommentRoutes } from "./routes/comments";
 import { registerReportRoutes } from "./routes/reports";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWebCommentRoutes } from "./routes/web/comments";
@@ -91,7 +92,7 @@ const r2Client = createR2Client({
   secretAccessKey: env.R2_SECRET_ACCESS_KEY,
 });
 const reportService = createReportService(db, { r2: r2Client });
-const commentService = createCommentService(db);
+const commentService = createCommentService(db, { usageService });
 const searchService = createSearchService(db);
 const ingestQueue = createQueue(
   QUEUE_NAMES.INGEST,
@@ -324,12 +325,16 @@ const baseApp = new Elysia()
     }
   );
 
-const appWithMcp = registerMcpRoutes(baseApp, {
-  reportService,
-  resolveAuth: (authorization, requestId) =>
-    resolveApiKeyFromRequest(db, authorization, requestId),
-  searchService,
-}) as typeof baseApp;
+const appWithMcp = registerCommentRoutes(
+  registerMcpRoutes(baseApp, {
+    commentService,
+    reportService,
+    resolveAuth: (authorization, requestId) =>
+      resolveApiKeyFromRequest(db, authorization, requestId),
+    searchService,
+  }) as typeof baseApp,
+  { commentService }
+) as typeof baseApp;
 
 const appWithRoutes = registerLinearIntegrationRoutes(
   registerWebCommentRoutes(

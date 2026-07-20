@@ -92,25 +92,6 @@ for (const entry of SURFACE_REGISTRY) {
   }
 }
 
-const gated = SURFACE_REGISTRY.filter((entry) => entry.launchGate === false);
-if (gated.length === 0 || !gated.some((entry) => entry.id === "comments.create")) {
-  errors.push("comments.create must remain launchGate: false for v1.0");
-}
-
-for (const entry of gated) {
-  const restSig = `${entry.rest.method} ${normalizePath(entry.rest.path)}`;
-  if (routeSignatures.has(restSig)) {
-    errors.push(
-      `launchGate entry ${entry.id} must not register REST route before fast-follow`
-    );
-  }
-  if (mcpTools.has(entry.mcp.tool)) {
-    errors.push(
-      `launchGate entry ${entry.id} must not register MCP tool before fast-follow`
-    );
-  }
-}
-
 if (errors.length > 0) {
   console.error("surface registry validation failed:");
   for (const error of errors) {

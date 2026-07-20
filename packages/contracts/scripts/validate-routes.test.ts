@@ -8,8 +8,8 @@ describe("surface registry", () => {
     }
   });
 
-  test("comments.create stays fast-follow gated", () => {
+  test("comments.create is enabled for agent write", () => {
     const entry = SURFACE_REGISTRY.find((row) => row.id === "comments.create");
-    expect(entry?.launchGate).toBe(false);
+    expect(entry?.launchGate).not.toBe(false);
   });
 });

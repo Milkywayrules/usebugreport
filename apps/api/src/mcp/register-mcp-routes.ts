@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type {
   AuthContext,
+  CommentService,
   ReportService,
   SearchService,
 } from "@usebugreport/services";
@@ -10,6 +11,7 @@ import { parseBearerToken } from "../middleware/api-key-auth";
 import { createMcpServer } from "./create-mcp-server";
 
 export interface McpRouteDeps {
+  commentService: CommentService;
   reportService: ReportService;
   resolveAuth: (
     authorization: string | null,
@@ -57,6 +59,7 @@ export function registerMcpRoutes(app: unknown, deps: McpRouteDeps): unknown {
     const transport = new WebStandardStreamableHTTPServerTransport();
     const server = createMcpServer({
       authContext,
+      commentService: deps.commentService,
       reportService: deps.reportService,
       searchService: deps.searchService,
     });

@@ -1,6 +1,7 @@
 // @ts-nocheck — MCP SDK registerTool inference blows TS stack on async handlers.
 import type {
   AuthContext,
+  CommentService,
   ReportService,
   SearchService,
 } from "@usebugreport/services";
@@ -12,6 +13,7 @@ import { MCP_TOOL_REGISTRATIONS, type McpToolName } from "./tools/registry";
 
 export interface CreateMcpServerDeps {
   authContext: AuthContext;
+  commentService: CommentService;
   reportService: ReportService;
   searchService: SearchService;
 }
@@ -53,6 +55,32 @@ export function createMcpServer(deps: CreateMcpServerDeps): McpServer {
       }
     );
   }
+
+  server.registerTool(
+    "create_comment",
+    {
+      description: "Create a report comment via CommentService.",
+      inputSchema: {
+        body: z.string(),
+        dedupeKey: z.string().optional(),
+        reportId: z.string(),
+      },
+    },
+    async (args: Record<string, unknown>) => {
+      assertMcpToolAllowed(deps.authContext, "create_comment");
+      const { handleMcpCreateComment } = await import("./mcp-comment-handlers");
+      const text = await handleMcpCreateComment(
+        {
+          authContext: deps.authContext,
+          commentService: deps.commentService,
+        },
+        args ?? {}
+      );
+      return {
+        content: [{ text, type: "text" as const }],
+      };
+    }
+  );
 
   server.registerTool(
     "reports_write_check",

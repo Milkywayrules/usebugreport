@@ -45,9 +45,8 @@ export async function postWebhookPayload(
       method: "POST",
       redirect: "manual",
       signal: controller.signal,
-      // @ts-expect-error Bun TLS SNI for pinned IP delivery
       tls: {
-        servername: parsed.hostname,
+        serverName: parsed.hostname,
       },
     });
     return { responseCode: response.status };
