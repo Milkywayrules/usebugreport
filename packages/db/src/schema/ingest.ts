@@ -13,6 +13,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
+import { projects } from "./projects";
 
 const tsvector = customType<{ data: string }>({
   dataType() {
@@ -64,7 +65,9 @@ export const reports = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    projectId: text("project_id").notNull(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
     reporterLabel: text("reporter_label"),
     searchVector: tsvector("search_vector").generatedAlwaysAs(
       sql`(
@@ -86,6 +89,11 @@ export const reports = pgTable(
     index("reports_org_status_created_idx").on(
       table.organizationId,
       table.status,
+      table.createdAt.desc()
+    ),
+    index("reports_org_project_created_idx").on(
+      table.organizationId,
+      table.projectId,
       table.createdAt.desc()
     ),
     uniqueIndex("reports_project_idempotency_uidx")

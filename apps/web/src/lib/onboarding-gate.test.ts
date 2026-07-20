@@ -34,10 +34,11 @@ describe("onboarding gate helpers", () => {
   });
 
   describe("isOnboardingAllowlistedPath", () => {
-    test("allows login, callback, and onboarding", () => {
+    test("allows login, callback, onboarding, and workspace settings", () => {
       expect(isOnboardingAllowlistedPath("/login")).toBe(true);
       expect(isOnboardingAllowlistedPath("/onboarding")).toBe(true);
       expect(isOnboardingAllowlistedPath("/auth/callback")).toBe(true);
+      expect(isOnboardingAllowlistedPath("/settings/workspaces")).toBe(true);
       expect(isOnboardingAllowlistedPath("/settings/account")).toBe(false);
     });
   });
@@ -72,7 +73,12 @@ describe("onboarding gate helpers", () => {
   });
 
   describe("shouldRedirectToOnboarding", () => {
-    const allowlistCases = ["/login", "/onboarding", "/auth/callback"] as const;
+    const allowlistCases = [
+      "/login",
+      "/onboarding",
+      "/auth/callback",
+      "/settings/workspaces",
+    ] as const;
 
     for (const path of allowlistCases) {
       test(`does not redirect zero-org user on allowlist path ${path}`, () => {

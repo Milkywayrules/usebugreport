@@ -3,7 +3,9 @@
 import {
   Alert,
   Button,
+  Code,
   Container,
+  Group,
   Stepper,
   Text,
   TextInput,
@@ -11,10 +13,15 @@ import {
 } from "@mantine/core";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { CopyKeyButton } from "@/components/copy-key-button";
 
 interface OnboardingFormProps {
-  createWorkspaceAction: (name: string) => Promise<{
+  createWorkspaceAction: (
+    name: string,
+    projectName?: string
+  ) => Promise<{
     error?: string;
+    ingestKeyPlaintext?: string;
     slug?: string;
   }>;
 }
@@ -33,7 +40,9 @@ function slugPreview(name: string): string {
 export function OnboardingForm({ createWorkspaceAction }: OnboardingFormProps) {
   const router = useRouter();
   const [workspaceName, setWorkspaceName] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [ingestKey, setIngestKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [completed, setCompleted] = useState(false);
 
@@ -42,10 +51,14 @@ export function OnboardingForm({ createWorkspaceAction }: OnboardingFormProps) {
     setError(null);
 
     startTransition(async () => {
-      const result = await createWorkspaceAction(workspaceName);
+      const result = await createWorkspaceAction(workspaceName, projectName);
       if (result.error) {
         setError(result.error);
         return;
+      }
+
+      if (result.ingestKeyPlaintext) {
+        setIngestKey(result.ingestKeyPlaintext);
       }
 
       setCompleted(true);
@@ -80,12 +93,27 @@ export function OnboardingForm({ createWorkspaceAction }: OnboardingFormProps) {
             ) : null}
 
             <TextInput
-              description="Created in the next step (E4-S3)"
-              disabled
+              disabled={completed || isPending}
               label="Project name"
               mb="md"
-              placeholder="Coming soon"
+              onChange={(event) => setProjectName(event.currentTarget.value)}
+              placeholder="Web App"
+              value={projectName}
             />
+
+            {ingestKey ? (
+              <Alert
+                color="blue"
+                data-testid="onboarding-ingest-key"
+                mb="md"
+                title="Ingest key (shown once)"
+              >
+                <Group align="flex-end" gap="sm">
+                  <Code block>{ingestKey}</Code>
+                  <CopyKeyButton value={ingestKey} />
+                </Group>
+              </Alert>
+            ) : null}
 
             {error ? (
               <Alert color="red" mb="md" title="Unable to create workspace">

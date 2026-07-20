@@ -1,5 +1,6 @@
 import { apiKey } from "@better-auth/api-key";
 import { createDbClient, type DbClient, schema } from "@usebugreport/db";
+import { createUsageService } from "@usebugreport/services";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, organization } from "better-auth/plugins";
@@ -31,7 +32,25 @@ export function initAuth(): void {
       provider: "pg",
       schema,
     }),
-    plugins: [organization(), apiKey(), bearer()],
+    plugins: [
+      organization({
+        allowUserToCreateOrganization: async () => false,
+        organizationCreation: {
+          beforeCreate: async ({ user }: { user: { id: string } }) => {
+            const usageService = createUsageService(db);
+            const tierCheck = await usageService.checkTierLimit(
+              { organizationId: "", userId: user.id },
+              "workspaces"
+            );
+            if (!tierCheck.allowed) {
+              throw new Error(tierCheck.message);
+            }
+          },
+        },
+      }),
+      apiKey(),
+      bearer(),
+    ],
     secret: env.BETTER_AUTH_SECRET,
     socialProviders: {
       github: {
