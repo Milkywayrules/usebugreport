@@ -17,6 +17,7 @@ export interface ReportServiceDeps {
 
 export interface ReportRecord {
   createdAt: Date;
+  linearIssueUrl: string | null;
   description: string | null;
   environment: Record<string, unknown>;
   id: string;
@@ -142,6 +143,7 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
         description: reports.description,
         environment: reports.environment,
         id: reports.id,
+        linearIssueUrl: reports.linearIssueUrl,
         ingestStatus: reports.ingestStatus,
         organizationId: reports.organizationId,
         projectId: reports.projectId,

@@ -20,6 +20,7 @@ export interface SpotlightCommandBridge {
   bulkPatchStatus?: (status: ReportStatusValue) => Promise<void>;
   bulkPushLinear?: () => void;
   canEdit?: boolean;
+  pushLinear?: () => void | Promise<void>;
   patchStatus?: (
     reportId: string,
     status: ReportStatusValue
@@ -77,6 +78,7 @@ export function useRegisterSpotlightBridge(
         bulkPatchStatus: undefined,
         bulkPushLinear: undefined,
         canEdit: undefined,
+        pushLinear: undefined,
         patchStatus: undefined,
         projects: [],
         reportId: undefined,
