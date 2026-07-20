@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: 2026-07-20 16:05
+# last_updated: 2026-07-20 16:15
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 16:05"
+last_updated: "2026-07-20 16:15"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -69,9 +69,9 @@ development_status:
   infra-2-shared-telemetry-package: backlog
   1-4-publishable-usebugreport-browser-sdk-package: done
   epic-3: in-progress  # E3 (launch)
-  3-1-web-app-shell-theme-and-route-scaffold: review
+  3-1-web-app-shell-theme-and-route-scaffold: done
   3-3-workspace-switcher-and-pinned-workspaces: backlog
-  2-2-presign-and-complete-ingest-path: review
+  2-2-presign-and-complete-ingest-path: done
   2-3-inline-ingest-path-with-ack-latency-measurement: backlog
   2-4-ingest-finalize-worker: backlog
   2-5-reportservice-metadata-reads-and-replay-manifest: backlog
