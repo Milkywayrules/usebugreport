@@ -15,14 +15,16 @@
     "test": "echo 'no tests'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check .",
-    "db:generate": "echo 'drizzle generate — E2-S1'",
-    "db:migrate": "echo 'drizzle migrate — E2-S1'"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@usebugreport/config": "workspace:*",
-    "drizzle-orm": "^0.38.0"
+    "drizzle-orm": "^0.38.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "drizzle-kit": "^0.31.10",
     "typescript": "^5.8.0"
   }
 }

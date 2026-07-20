@@ -1,1 +1,1 @@
-export const schemaPlaceholder = true;
+export * from "./auth";

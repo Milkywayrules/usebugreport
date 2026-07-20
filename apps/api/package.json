@@ -6,14 +6,20 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "bun --watch src/index.ts",
-    "test": "echo 'no tests'",
+    "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check ."
   },
   "dependencies": {
+    "@better-auth/api-key": "^1.6.23",
+    "@elysiajs/cors": "^1.2.0",
     "@usebugreport/config": "workspace:*",
+    "@usebugreport/db": "workspace:*",
     "@usebugreport/services": "workspace:*",
-    "elysia": "^1.2.0"
+    "better-auth": "^1.2.0",
+    "drizzle-orm": "^0.38.0",
+    "elysia": "^1.2.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

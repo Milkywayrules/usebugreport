@@ -1,6 +1,44 @@
-/** Drizzle client placeholder — wired in E2-S1. */
-export function createDbClient(_databaseUrl: string) {
-  return { status: "stub" as const };
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import {
+  account,
+  accountRelations,
+  apikey,
+  invitation,
+  invitationRelations,
+  member,
+  memberRelations,
+  organization,
+  organizationRelations,
+  session,
+  sessionRelations,
+  user,
+  userRelations,
+  verification,
+} from "./schema/index";
+
+export const schema = {
+  account,
+  accountRelations,
+  apikey,
+  invitation,
+  invitationRelations,
+  member,
+  memberRelations,
+  organization,
+  organizationRelations,
+  session,
+  sessionRelations,
+  user,
+  userRelations,
+  verification,
+};
+
+export type DbClient = PostgresJsDatabase<typeof schema>;
+
+export function createDbClient(databaseUrl: string): DbClient {
+  const client = postgres(databaseUrl, { max: 10 });
+  return drizzle(client, { schema });
 }
 
-export { schemaPlaceholder } from "./schema/index";
+export * from "./schema/index";

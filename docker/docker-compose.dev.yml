@@ -1,0 +1,25 @@
+# Local development — Postgres 16 + Redis (architecture §1, §13)
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: usebugreport
+      POSTGRES_PASSWORD: usebugreport
+      POSTGRES_DB: usebugreport
+    volumes:
+      - usebugreport_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usebugreport -d usebugreport"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  usebugreport_pg_data:
