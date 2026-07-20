@@ -26,5 +26,9 @@
     "turbo": "^2.5.0",
     "typescript": "^5.8.0",
     "ultracite": "^7.0.0"
+  },
+  "overrides": {
+    "@aws-sdk/client-s3": "3.787.0",
+    "@aws-sdk/s3-request-presigner": "3.787.0"
   }
 }
