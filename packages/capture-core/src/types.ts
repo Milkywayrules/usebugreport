@@ -25,9 +25,13 @@ export interface CaptureCoreConfig {
   bufferSeconds?: number;
   captureConsole?: boolean;
   captureNetwork?: boolean;
+  /** When false, submit payload omits screenshot part (default true). */
+  captureScreenshot?: boolean;
   ignoreRequestFn?: (url: string) => boolean;
   maskSelectors?: string[];
+  metadataProvider?: () => Record<string, unknown>;
   networkBodyMaxBytes?: number;
+  screenshotMode?: "viewport" | "fullPage";
   /** When true, out-of-range bufferSeconds throws instead of clamping. */
   strictBufferSeconds?: boolean;
 }
@@ -38,11 +42,16 @@ export type ResolvedCaptureCoreConfig = Required<
     | "bufferSeconds"
     | "captureConsole"
     | "captureNetwork"
+    | "captureScreenshot"
     | "networkBodyMaxBytes"
     | "blockClass"
+    | "screenshotMode"
   >
 > &
-  Pick<CaptureCoreConfig, "maskSelectors" | "ignoreRequestFn">;
+  Pick<
+    CaptureCoreConfig,
+    "ignoreRequestFn" | "maskSelectors" | "metadataProvider"
+  >;
 
 export type ConsoleSnapshotEvent = LogData & { timestamp: number };
 
@@ -72,5 +81,71 @@ export interface Recorder {
   dispose: () => void;
   exportSnapshot: (options?: ExportBufferSnapshotOptions) => BufferSnapshot;
   getBufferSeconds: () => number;
+  getResolvedConfig: () => ResolvedCaptureCoreConfig;
   stop: () => void;
+}
+
+export interface EnvironmentMetadata {
+  browser: { name: string; version: string };
+  connection?: {
+    downlink?: number;
+    effectiveType?: string;
+    rtt?: number;
+  };
+  custom?: Record<string, unknown>;
+  devicePixelRatio: number;
+  locale: string;
+  os: { name: string; version?: string };
+  referrer: string;
+  timestamp: string;
+  timezone: string;
+  url: string;
+  userAgent: string;
+  viewport: { height: number; width: number };
+}
+
+export interface ScreenshotCaptureResult {
+  blob: Blob;
+  byteLength: number;
+  contentType: "image/webp";
+  height: number;
+  width: number;
+}
+
+export interface GzipBlobPart {
+  blob: Blob;
+  byteLength: number;
+  contentType: "application/gzip";
+  /** Logical part name for E2 upload mapping (e.g. replay/batch-0.json.gz). */
+  name: string;
+  seq?: number;
+}
+
+export interface CaptureSubmitPayload {
+  /** ISO-8601 assembly time (may match snapshot.exportedAt). */
+  assembledAt: string;
+  bufferSeconds: number;
+  parts: {
+    console: GzipBlobPart;
+    meta: {
+      blob: Blob;
+      contentType: "application/json";
+      json: EnvironmentMetadata;
+    };
+    network: GzipBlobPart;
+    replay: GzipBlobPart[];
+    screenshot: {
+      blob: Blob;
+      byteLength: number;
+      contentType: "image/webp";
+    } | null;
+  };
+  /** Raw snapshot retained for tests/debug; E2 may ignore. */
+  snapshot: BufferSnapshot;
+}
+
+export interface AssembleSubmitPayloadOptions
+  extends ExportBufferSnapshotOptions {
+  /** Override recorder config for this assembly only. */
+  config?: Partial<CaptureCoreConfig>;
 }

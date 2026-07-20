@@ -50,9 +50,12 @@ function resolveConfig(
     ),
     captureConsole: config.captureConsole ?? true,
     captureNetwork: config.captureNetwork ?? true,
+    captureScreenshot: config.captureScreenshot ?? true,
     ignoreRequestFn: config.ignoreRequestFn,
     maskSelectors: config.maskSelectors,
+    metadataProvider: config.metadataProvider,
     networkBodyMaxBytes: config.networkBodyMaxBytes ?? 32_768,
+    screenshotMode: config.screenshotMode ?? "viewport",
   };
 }
 
@@ -176,6 +179,7 @@ export function createRecorder(config: CaptureCoreConfig = {}): Recorder {
     dispose,
     exportSnapshot,
     getBufferSeconds: () => resolved.bufferSeconds,
+    getResolvedConfig: () => resolved,
     stop,
   };
 }
