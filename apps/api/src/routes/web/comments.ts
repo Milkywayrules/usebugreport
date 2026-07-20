@@ -65,8 +65,12 @@ export function registerWebCommentRoutes(
         );
         return {
           data: thread.comments.map((row) => ({
-            ...row,
+            authorDisplayName: row.authorDisplayName,
+            authorType: row.authorType,
+            body: row.body,
             createdAt: row.createdAt.toISOString(),
+            id: row.id,
+            reportId: row.reportId,
           })),
           meta: { canComment: thread.canComment },
           requestId: authResult.value.requestId,

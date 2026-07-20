@@ -1,4 +1,4 @@
-/** MCP read tool registrations (transport wired in E5-S1). */
+/** MCP tool registrations (transport wired in E5-S1). */
 export const MCP_TOOL_REGISTRATIONS = {
   list_reports: { surfaceId: "reports.list", tool: "list_reports" },
   get_report: { surfaceId: "reports.get", tool: "get_report" },
@@ -9,6 +9,7 @@ export const MCP_TOOL_REGISTRATIONS = {
     tool: "get_network_requests",
   },
   search_reports: { surfaceId: "reports.search", tool: "search_reports" },
+  create_comment: { surfaceId: "comments.create", tool: "create_comment" },
 } as const;
 
 export type McpToolName = keyof typeof MCP_TOOL_REGISTRATIONS;
