@@ -21,6 +21,7 @@ export interface ReportDetailRecord {
   environment: Record<string, unknown>;
   id: string;
   ingestStatus: string;
+  linearIssueUrl: string | null;
   projectId: string;
   retentionDaysReplay?: number;
   status: string;

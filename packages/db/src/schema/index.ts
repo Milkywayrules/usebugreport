@@ -6,3 +6,4 @@ export * from "./projects";
 export * from "./comments";
 export * from "./integrations";
 export * from "./integration-operations";
+export * from "./webhooks";

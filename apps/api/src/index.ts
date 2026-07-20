@@ -15,6 +15,7 @@ import {
   createReportService,
   createSearchService,
   createUsageService,
+  createWebhookService,
   createWorkspaceService,
   ServiceError,
   servicesReady,
@@ -48,6 +49,7 @@ import { registerReportRoutes } from "./routes/reports";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWebCommentRoutes } from "./routes/web/comments";
 import { registerWorkspaceRoutes } from "./routes/workspaces";
+import { registerWebhookRoutes } from "./routes/webhooks";
 import { registerMcpRoutes } from "./mcp/register-mcp-routes";
 
 initAuth();
@@ -94,6 +96,10 @@ const integrationsQueue = createQueue(
   QUEUE_NAMES.INTEGRATIONS,
   integrationsLinearPushPayloadSchema
 );
+const webhookService = createWebhookService(db, {
+  encryptionKey: env.ENCRYPTION_KEY,
+  usageService,
+});
 const integrationService = createIntegrationService(db, {
   appUrl: env.APP_URL,
   encryptionKey: env.ENCRYPTION_KEY,
@@ -308,7 +314,11 @@ const appWithRoutes = registerLinearIntegrationRoutes(
     registerApiKeyRoutes(
       registerUserPreferenceRoutes(
         registerProjectMemberRoutes(
-          registerProjectRoutes(registerWorkspaceRoutes(appWithMcp))
+          registerProjectRoutes(
+            registerWebhookRoutes(registerWorkspaceRoutes(appWithMcp), {
+              webhookService,
+            })
+          )
         )
       )
     ),

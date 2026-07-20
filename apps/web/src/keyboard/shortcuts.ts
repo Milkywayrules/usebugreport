@@ -239,6 +239,12 @@ export const REPORT_DETAIL_SHORTCUTS = {
     label: "Back to list",
     group: "Report detail",
   },
+  pushLinear: {
+    id: "detail.push-linear",
+    keys: "p",
+    label: "Push to Linear",
+    group: "Report detail",
+  },
   copyUrl: {
     id: "detail.copy-url",
     keys: "l",

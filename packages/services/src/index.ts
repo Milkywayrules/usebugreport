@@ -92,6 +92,12 @@ export {
   type UsageServiceDeps,
 } from "./usage";
 export {
+  createWebhookService,
+  type WebhookService,
+  WEBHOOK_LAUNCH_EVENTS,
+  type WebhookLaunchEvent,
+} from "./webhook";
+export {
   createWorkspaceService,
   MAX_PINNED_WORKSPACES,
   slugifyWorkspaceName,

@@ -100,15 +100,15 @@ development_status:
   7-3-outbox-pending-and-failed-conflict-branches: done
   3-6-bulk-linear-push: done
   epic-3-retrospective: optional
-  7-4-linear-push-ux-single-palette-and-errors: backlog
+  7-4-linear-push-ux-single-palette-and-errors: done
   epic-7-retrospective: optional
   epic-5: in-progress  # E5 (launch)
   5-1-mcp-streamable-http-transport-and-auth: done
   5-2-mcp-read-tools-from-surface-registry: review
   5-3-mcp-parity-contract-tests-streamable-http: backlog
   epic-5-retrospective: optional
-  epic-8: backlog  # E8 (launch)
-  8-1-webhook-registration-with-pro-tier-gate: backlog
+  epic-8: in-progress  # E8 (launch)
+  8-1-webhook-registration-with-pro-tier-gate: done
   8-2-webhook-dispatch-and-hmac-delivery: backlog
   8-3-ssrf-controls-with-ip-pinning-at-delivery: backlog
   8-4-webhook-debug-ui: backlog
