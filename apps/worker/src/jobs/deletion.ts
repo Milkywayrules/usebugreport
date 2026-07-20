@@ -48,6 +48,14 @@ export function createDeletionWorker(): Worker {
         await deletionService.processExternalPurge(payload);
         return;
       }
+      if (job.name === JOB_NAMES.DELETION_AUDIT_TERMINAL) {
+        await deletionService.processAuditTerminal(payload);
+        return;
+      }
+      if (job.name === JOB_NAMES.DELETION_POSTGRES_PURGE) {
+        await deletionService.processPostgresPurge(payload);
+        return;
+      }
     },
     {
       concurrency: DELETION_CONCURRENCY,

@@ -28,3 +28,10 @@ describe("purgeOrganizationR2Prefix", () => {
     expect(deleted).toEqual(["org1/p1/r1/a", "org1/p1/r1/b"]);
   });
 });
+
+describe("deletion step ordering", () => {
+  test("audit_terminal follows external_purge in DELETION_STEPS", () => {
+    expect(DELETION_STEPS.AUDIT_TERMINAL).toBe("audit_terminal");
+    expect(DELETION_STEPS.POSTGRES_PURGE).toBe("postgres_purge");
+  });
+});
