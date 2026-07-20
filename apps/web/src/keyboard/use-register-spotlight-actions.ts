@@ -132,6 +132,12 @@ export function useRegisterSpotlightActions({
         `/w/${slug}/settings/integrations/linear`,
         ["linear"]
       ),
+      nav(
+        "nav.integrations.github",
+        "GitHub integration",
+        `/w/${slug}/settings/integrations/github`,
+        ["github", "issues"]
+      ),
       nav("nav.api-keys", "API keys", `/w/${slug}/settings/api-keys`, ["api", "mcp"]),
       nav("nav.webhooks", "Webhooks", `/w/${slug}/settings/webhooks`, ["webhook"]),
       nav("nav.usage", "Usage & billing", `/w/${slug}/settings/usage`, ["usage"]),

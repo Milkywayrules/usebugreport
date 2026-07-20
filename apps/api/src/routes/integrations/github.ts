@@ -1,6 +1,8 @@
 import type { IntegrationService } from "@usebugreport/services";
 import { ServiceError } from "@usebugreport/services";
+import { organization } from "@usebugreport/db";
 import type { Elysia } from "elysia";
+import { eq } from "drizzle-orm";
 import { db } from "../../lib/auth";
 import { getEnv } from "../../lib/env";
 import { serviceErrorToHttp } from "../../lib/errors";
@@ -111,10 +113,15 @@ export function registerGitHubIntegrationRoutes(
 
       try {
         await integrationService.connectGitHub(resolved, { code, state });
-        const slug = url.searchParams.get("workspace") ?? "";
+        const [orgRow] = await db
+          .select({ slug: organization.slug })
+          .from(organization)
+          .where(eq(organization.id, resolved.organizationId))
+          .limit(1);
+        const slug = orgRow?.slug ?? "";
         const redirect = slug
-          ? `${env.APP_URL}/w/${slug}/settings/integrations?github=connected`
-          : `${env.APP_URL}/settings/integrations?github=connected`;
+          ? `${env.APP_URL}/w/${slug}/settings/integrations/github?github=connected`
+          : `${env.APP_URL}/settings/integrations/github?github=connected`;
         return Response.redirect(redirect, 302);
       } catch (error) {
         return handleServiceError(error, authResult.value.requestId);
