@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 24:12"
+last_updated: "2026-07-20 24:45"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -109,7 +109,7 @@ development_status:
   epic-5-retrospective: optional
   epic-8: in-progress  # E8 (launch)
   8-1-webhook-registration-with-pro-tier-gate: done
-  8-2-webhook-dispatch-and-hmac-delivery: backlog
+  8-2-webhook-dispatch-and-hmac-delivery: review
   8-3-ssrf-controls-with-ip-pinning-at-delivery: backlog
   8-4-webhook-debug-ui: backlog
   epic-8-retrospective: optional

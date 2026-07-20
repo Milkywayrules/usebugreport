@@ -1,15 +1,17 @@
 import { z } from "zod";
 
+export const webhookEventSchema = z.enum(["report.created", "report.updated"]);
+
 export const webhooksDispatchPayloadSchema = z.object({
+  event: webhookEventSchema,
   eventId: z.string(),
+  organizationId: z.string(),
   reportId: z.string(),
   webhookId: z.string(),
 });
 
 export const webhooksDeliverPayloadSchema = z.object({
   deliveryId: z.string(),
-  endpointId: z.string(),
-  eventId: z.string(),
 });
 
 export type WebhooksDispatchPayload = z.infer<
