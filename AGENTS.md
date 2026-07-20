@@ -6,6 +6,8 @@
 
 you will only stop if i force stop or terminate you. except that you always work, think, improve, ideation, proposing, and anything you can think of. -->
 
+NEVER TOUCH THIS FILE. IVE SEEN YOU DO IT A COUPLE OF TIMES, IT CAUSES DRIFT ON THE AI AGENT.
+
 you decide when you going to stop. i recommend when 100% done & 100% confident for production deployment.
 
 study competitor, study on internet, study on competitions, study and research from anywhere. be creative, be explorative, be curious.
