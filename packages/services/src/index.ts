@@ -17,6 +17,7 @@ export {
   DELETION_STEPS,
   type DeletionService,
   type DeletionStep,
+  purgeOrganizationR2Prefix,
 } from "./deletion";
 export {
   createCommentService,

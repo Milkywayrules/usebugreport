@@ -1,4 +1,5 @@
 import type { DbClient } from "@usebugreport/db";
+import type { R2Client } from "@usebugreport/storage";
 import {
   deletionTombstones,
   ingestKeys,
@@ -35,11 +36,36 @@ export interface DeletionEnqueuePayload {
   tombstoneId: string;
 }
 
+const R2_DELETE_BATCH_SIZE = 1000;
+
+export async function purgeOrganizationR2Prefix(
+  r2: R2Client,
+  organizationId: string
+): Promise<number> {
+  const prefix = `${organizationId}/`;
+  const objects = await r2.listObjects(prefix);
+  let removed = 0;
+  for (let index = 0; index < objects.length; index += R2_DELETE_BATCH_SIZE) {
+    const batch = objects.slice(index, index + R2_DELETE_BATCH_SIZE);
+    for (const object of batch) {
+      try {
+        await r2.deleteObject(object.key);
+        removed += 1;
+      } catch {
+        // idempotent — missing keys are fine on retry
+      }
+    }
+  }
+  return removed;
+}
+
 export interface DeletionServiceDeps {
   enqueueDeletionJob: (
     jobName: DeletionJobName,
     payload: DeletionEnqueuePayload
   ) => Promise<void>;
+  purgeOrgRedisKeys: (organizationId: string, projectIds: string[]) => Promise<void>;
+  r2: R2Client;
 }
 
 function stepRank(step: string | null | undefined): number {
@@ -212,6 +238,50 @@ export function createDeletionService(db: DbClient, deps: DeletionServiceDeps) {
         status: row.status,
         tombstoneId: row.id,
       };
+    },
+
+    async processExternalPurge(payload: DeletionEnqueuePayload): Promise<number> {
+      const [tombstone] = await db
+        .select()
+        .from(deletionTombstones)
+        .where(eq(deletionTombstones.id, payload.tombstoneId))
+        .limit(1);
+
+      if (!tombstone || tombstone.organizationId !== payload.organizationId) {
+        throw new ServiceError("NOT_FOUND", "Deletion tombstone not found.");
+      }
+
+      if (stepRank(tombstone.lastCompletedStep) >= stepRank(DELETION_STEPS.EXTERNAL_PURGE)) {
+        return 0;
+      }
+
+      if (stepRank(tombstone.lastCompletedStep) < stepRank(DELETION_STEPS.NOTIFY)) {
+        throw new ServiceError(
+          "VALIDATION_ERROR",
+          "External purge cannot run before notify step completes."
+        );
+      }
+
+      const projectRows = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.organizationId, payload.organizationId));
+
+      const removedObjects = await purgeOrganizationR2Prefix(deps.r2, payload.organizationId);
+      await deps.purgeOrgRedisKeys(
+        payload.organizationId,
+        projectRows.map((row) => row.id)
+      );
+
+      await db
+        .update(deletionTombstones)
+        .set({
+          lastCompletedStep: DELETION_STEPS.EXTERNAL_PURGE,
+          status: "external_purge",
+        })
+        .where(eq(deletionTombstones.id, payload.tombstoneId));
+
+      return removedObjects;
     },
 
     async processNotifyOwner(payload: DeletionEnqueuePayload): Promise<void> {

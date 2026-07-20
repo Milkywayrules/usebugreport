@@ -8,3 +8,23 @@ describe("DELETION_STEPS", () => {
     expect(DELETION_STEPS.EXTERNAL_PURGE).toBe("external_purge");
   });
 });
+
+import { purgeOrganizationR2Prefix } from "./deletion";
+
+describe("purgeOrganizationR2Prefix", () => {
+  test("deletes listed keys in batches idempotently", async () => {
+    const deleted: string[] = [];
+    const r2 = {
+      deleteObject: async (key: string) => {
+        deleted.push(key);
+      },
+      listObjects: async () => [
+        { key: "org1/p1/r1/a" },
+        { key: "org1/p1/r1/b" },
+      ],
+    };
+    const count = await purgeOrganizationR2Prefix(r2 as never, "org1");
+    expect(count).toBe(2);
+    expect(deleted).toEqual(["org1/p1/r1/a", "org1/p1/r1/b"]);
+  });
+});

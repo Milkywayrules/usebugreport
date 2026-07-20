@@ -7,7 +7,9 @@ import {
   JOB_NAMES,
   QUEUE_NAMES,
 } from "@usebugreport/queue";
+import { purgeOrganizationRedisKeys } from "@usebugreport/queue";
 import { createDeletionService } from "@usebugreport/services";
+import { createR2Client } from "@usebugreport/storage";
 import { type Job, Worker } from "bullmq";
 
 const DELETION_CONCURRENCY = 2;
@@ -15,10 +17,18 @@ const DELETION_CONCURRENCY = 2;
 export function createDeletionWorker(): Worker {
   const env = parseEnv(process.env);
   const db = createDbClient(env.DATABASE_URL);
+  const r2 = createR2Client({
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    accountId: env.R2_ACCOUNT_ID,
+    bucket: env.R2_BUCKET,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+  });
   const deletionQueue = createQueue(QUEUE_NAMES.DELETION, deletionStepPayloadSchema);
   const connection = createRedisConnection();
 
   const deletionService = createDeletionService(db, {
+    purgeOrgRedisKeys: purgeOrganizationRedisKeys,
+    r2,
     enqueueDeletionJob: async (jobName, payload) => {
       await deletionQueue.add(jobName, deletionStepPayloadSchema.parse(payload), {
         jobId: `${payload.tombstoneId}-${jobName}-${Date.now()}`,
@@ -35,7 +45,8 @@ export function createDeletionWorker(): Worker {
         return;
       }
       if (job.name === JOB_NAMES.DELETION_EXTERNAL_PURGE) {
-        throw new Error("deletion.external_purge handler not loaded");
+        await deletionService.processExternalPurge(payload);
+        return;
       }
     },
     {
