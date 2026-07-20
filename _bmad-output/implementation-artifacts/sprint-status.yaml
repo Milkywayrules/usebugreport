@@ -86,7 +86,7 @@ development_status:
   3-7-report-detail-and-replay-viewer: done
   3-10-central-keyboard-shortcuts-registry: done  # AD-10 registry before E3-S9 palette
   3-5-bulk-status-change: done
-  3-8-human-web-comments-fr-26-lg-2: backlog
+  3-8-human-web-comments-fr-26-lg-2: review
   3-9-command-palette-cmd-k: backlog
   epic-6: in-progress  # E6 (launch)
   6-1-domain-services-and-ad-1-lint-gate: done

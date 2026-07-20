@@ -30,3 +30,16 @@ export interface ReportDetailRecord {
   updatedAt: string;
   workspaceSlug: string | null;
 }
+
+export interface ReportCommentRecord {
+  authorDisplayName: string;
+  body: string;
+  createdAt: string;
+  id: string;
+  reportId: string;
+}
+
+export interface ReportCommentsResponse {
+  canComment: boolean;
+  comments: ReportCommentRecord[];
+}
