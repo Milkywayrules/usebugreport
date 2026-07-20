@@ -8,6 +8,7 @@ export type ProjectAction =
   | "project:read"
   | "ingest:submit"
   | "integration:manage"
+  | "github:push"
   | "linear:push"
   | "report:comment"
   | "report:delete"

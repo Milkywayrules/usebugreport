@@ -25,6 +25,7 @@ export const projects = pgTable(
       .defaultNow()
       .notNull(),
     defaultLinearTeamId: text("default_linear_team_id"),
+    defaultGithubRepo: text("default_github_repo"),
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     organizationId: text("organization_id")

@@ -22,6 +22,7 @@ const ACTION_MIN_ROLE: Record<ProjectAction, ProjectRole> = {
   "ingest:rotate": "admin",
   "ingest:submit": "reporter",
   "integration:manage": "developer",
+  "github:push": "developer",
   "linear:push": "developer",
   "project:delete": "admin",
   "project:manage_members": "admin",

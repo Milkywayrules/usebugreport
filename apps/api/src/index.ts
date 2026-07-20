@@ -48,6 +48,7 @@ import { registerApiKeyRoutes } from "./routes/api-keys";
 import { registerCaptureRoutes } from "./routes/capture";
 import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
+import { registerGitHubIntegrationRoutes } from "./routes/integrations/github";
 import { registerLinearIntegrationRoutes } from "./routes/integrations/linear";
 import { registerCommentRoutes } from "./routes/comments";
 import { registerReportRoutes } from "./routes/reports";
@@ -150,8 +151,17 @@ const webhookService = createWebhookService(db, {
 const integrationService = createIntegrationService(db, {
   appUrl: env.APP_URL,
   encryptionKey: env.ENCRYPTION_KEY,
+  githubClientId: env.GITHUB_CLIENT_ID,
+  githubClientSecret: env.GITHUB_CLIENT_SECRET,
   linearClientId: env.LINEAR_CLIENT_ID,
   linearClientSecret: env.LINEAR_CLIENT_SECRET,
+  enqueueGitHubPush: async (payload) => {
+    await integrationsQueue.add(
+      JOB_NAMES.INTEGRATIONS_GITHUB_PUSH,
+      integrationsLinearPushPayloadSchema.parse(payload),
+      { jobId: `github-${payload.operationId}` }
+    );
+  },
   enqueueLinearPush: async (payload) => {
     await integrationsQueue.add(
       JOB_NAMES.INTEGRATIONS_LINEAR_PUSH,
@@ -359,7 +369,8 @@ const appWithMcp = registerCommentRoutes(
   { commentService, onCommentCreated: enqueueCommentCreatedWebhooks }
 ) as typeof baseApp;
 
-const appWithRoutes = registerLinearIntegrationRoutes(
+const appWithRoutes = registerGitHubIntegrationRoutes(
+  registerLinearIntegrationRoutes(
   registerWebCommentRoutes(
   registerCaptureRoutes(
     registerReportRoutes(
@@ -403,6 +414,8 @@ const appWithRoutes = registerLinearIntegrationRoutes(
     }
   ),
   { commentService, onCommentCreated: enqueueCommentCreatedWebhooks }
+  ),
+  { integrationService }
   ),
   { integrationService }
 ) as typeof baseApp;

@@ -17,6 +17,7 @@ export const JOB_NAMES = {
   DELETION_NOTIFY_OWNER: "deletion.notify_owner",
   DELETION_POSTGRES_PURGE: "deletion.postgres_purge",
   INGEST_FINALIZE: "ingest.finalize",
+  INTEGRATIONS_GITHUB_PUSH: "integrations.github_push",
   INTEGRATIONS_LINEAR_PUSH: "integrations.linear_push",
   RETENTION_SWEEP: "retention.sweep",
   WEBHOOKS_DELIVER: "webhooks.deliver",

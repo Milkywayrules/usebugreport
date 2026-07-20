@@ -9,7 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
 
-export const integrationTypeEnum = pgEnum("integration_type", ["linear"]);
+export const integrationTypeEnum = pgEnum("integration_type", ["linear", "github"]);
 
 export const integrations = pgTable(
   "integrations",
