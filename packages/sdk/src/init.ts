@@ -3,9 +3,10 @@ import {
   createRecorder,
 } from "@usebugreport/capture-core";
 import { isInitialized, setInitialized } from "./state";
-import type { UseBugReportInitOptions } from "./types";
+import type { UseBugReportInitOptions, WidgetInitOptions } from "./types";
 import { UseBugReportConfigError } from "./types";
 import { validateProjectKey } from "./validate";
+import { mountSubmitWidget } from "./widget";
 
 function assertBrowserEnvironment(): void {
   if (typeof window === "undefined") {
@@ -42,9 +43,26 @@ export function init(options: UseBugReportInitOptions): void {
 
   const recorder = createRecorder(mapInitOptions(options));
 
+  const apiBaseUrl = options.apiBaseUrl?.trim() || window.location.origin;
+  const widgetEnabled = options.widget !== false;
+
+  let widgetHost: import("./widget").WidgetHost | null = null;
+  if (widgetEnabled) {
+    const widgetOptions: WidgetInitOptions =
+      typeof options.widget === "object" ? options.widget : {};
+    widgetHost = mountSubmitWidget({
+      apiBaseUrl,
+      hotkey: widgetOptions.hotkey,
+      onComplete: options.onSubmit ?? undefined,
+      showFloatingButton: widgetOptions.showFloatingButton,
+    });
+  }
+
   setInitialized({
+    apiBaseUrl,
     onSubmit: options.onSubmit ?? null,
     projectKey: options.projectKey,
     recorder,
+    widgetHost,
   });
 }

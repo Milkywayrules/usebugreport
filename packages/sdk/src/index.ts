@@ -1,4 +1,9 @@
 export { dispose } from "./dispose";
+export {
+  type UploadCaptureResult,
+  UseBugReportIngestError,
+  uploadCapturePayload,
+} from "./ingest-client";
 export { init } from "./init";
 export { submit } from "./submit";
 export {
@@ -7,7 +12,14 @@ export {
   UseBugReportConfigError,
   type UseBugReportInitOptions,
   UseBugReportNotInitializedError,
+  type WidgetInitOptions,
 } from "./types";
+export {
+  mountSubmitWidget,
+  openSubmitModal,
+  type WidgetHost,
+  type WidgetHostOptions,
+} from "./widget";
 
 import { dispose } from "./dispose";
 import { init } from "./init";

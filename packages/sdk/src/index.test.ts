@@ -60,17 +60,17 @@ describe("@usebugreport/browser public API", () => {
 
 describe("init", () => {
   test("throws UseBugReportConfigError for invalid projectKey before recording", () => {
-    expect(() => init({ projectKey: "invalid" })).toThrow(
+    expect(() => init({ projectKey: "invalid", widget: false })).toThrow(
       UseBugReportConfigError
     );
   });
 
   test("throws when already initialized", () => {
-    init({ projectKey: VALID_KEY });
-    expect(() => init({ projectKey: VALID_KEY })).toThrow(
+    init({ projectKey: VALID_KEY, widget: false });
+    expect(() => init({ projectKey: VALID_KEY, widget: false })).toThrow(
       UseBugReportConfigError
     );
-    expect(() => init({ projectKey: VALID_KEY })).toThrow(
+    expect(() => init({ projectKey: VALID_KEY, widget: false })).toThrow(
       ALREADY_INITIALIZED_PATTERN
     );
   });
@@ -84,6 +84,7 @@ describe("init", () => {
       init({
         metadata: () => ({ appVersion: "1.2.3" }),
         projectKey: VALID_KEY,
+        widget: false,
       });
 
       const result = await submit({ title: "Init smoke" });
@@ -105,7 +106,7 @@ describe("submit", () => {
   });
 
   test("throws after dispose", async () => {
-    init({ projectKey: VALID_KEY });
+    init({ projectKey: VALID_KEY, widget: false });
     dispose();
     await expect(submit({ title: "after dispose" })).rejects.toThrow(
       UseBugReportNotInitializedError
@@ -124,6 +125,7 @@ describe("submit", () => {
           callbackResult = submitResult;
         },
         projectKey: VALID_KEY,
+        widget: false,
       });
 
       const result = await submit({

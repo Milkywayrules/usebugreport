@@ -18,7 +18,16 @@ export class UseBugReportNotInitializedError extends Error {
   }
 }
 
+export interface WidgetInitOptions {
+  /** Keyboard chord to open widget (default Shift+Alt+B). */
+  hotkey?: string;
+  /** Show floating action button (default true). */
+  showFloatingButton?: boolean;
+}
+
 export interface UseBugReportInitOptions {
+  /** API origin for capture ingest routes (default: current page origin). */
+  apiBaseUrl?: string;
   blockClass?: string;
   bufferSeconds?: number;
   captureConsole?: boolean;
@@ -32,6 +41,8 @@ export interface UseBugReportInitOptions {
   onSubmit?: (result: SubmitResult) => void | Promise<void>;
   projectKey: string;
   screenshotMode?: "viewport" | "fullPage";
+  /** Mount shadow-DOM submit widget (default true). */
+  widget?: boolean | WidgetInitOptions;
 }
 
 export interface SubmitOptions {
@@ -43,5 +54,7 @@ export interface SubmitResult {
   description?: string;
   payload: CaptureSubmitPayload;
   projectKey: string;
+  /** Present after successful HTTP ingest (E1-S5 widget path). */
+  reportId?: string;
   title: string;
 }
