@@ -152,3 +152,44 @@ export interface WorkspaceMemberRow {
   role: string;
   userId: string;
 }
+
+export interface ReportLookup {
+  id: string;
+  workspaceSlug: string;
+}
+
+export async function fetchReport(
+  reportId: string
+): Promise<ReportLookup | null> {
+  const response = await apiFetch(`/api/v1/reports/${reportId}`);
+  if (!response.ok) {
+    return null;
+  }
+
+  const body = (await response.json()) as {
+    data?: {
+      id?: string;
+      organizationSlug?: string;
+      workspaceSlug?: string;
+    };
+    organizationSlug?: string;
+    workspaceSlug?: string;
+  };
+
+  const data = body.data ?? body;
+  const workspaceSlug =
+    "workspaceSlug" in data
+      ? (data.workspaceSlug ?? data.organizationSlug)
+      : (body.workspaceSlug ?? body.organizationSlug);
+  if (!workspaceSlug) {
+    return null;
+  }
+
+  const reportIdFromBody =
+    "id" in data && typeof data.id === "string" ? data.id : reportId;
+
+  return {
+    id: reportIdFromBody,
+    workspaceSlug,
+  };
+}

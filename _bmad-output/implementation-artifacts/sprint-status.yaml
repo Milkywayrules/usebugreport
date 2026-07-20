@@ -68,8 +68,8 @@ development_status:
   infra-1-api-platform-hardening-and-billing-mocks: done
   infra-2-shared-telemetry-package: backlog
   1-4-publishable-usebugreport-browser-sdk-package: done
-  epic-3: backlog  # E3 (launch)
-  3-1-web-app-shell-theme-and-route-scaffold: backlog
+  epic-3: in-progress  # E3 (launch)
+  3-1-web-app-shell-theme-and-route-scaffold: review
   3-3-workspace-switcher-and-pinned-workspaces: backlog
   2-2-presign-and-complete-ingest-path: review
   2-3-inline-ingest-path-with-ack-latency-measurement: backlog

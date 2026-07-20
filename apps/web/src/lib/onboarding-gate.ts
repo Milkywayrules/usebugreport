@@ -42,6 +42,9 @@ export function isProtectedPath(pathname: string): boolean {
   if (pathname.startsWith("/settings/")) {
     return true;
   }
+  if (pathname.startsWith("/r/")) {
+    return true;
+  }
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
     return true;
   }

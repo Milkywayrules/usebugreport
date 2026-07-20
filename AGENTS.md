@@ -2,9 +2,13 @@
 
 ## Hard gate to follow
 
-You must endlessly work. no automated end here.
+<!-- You must endlessly work. no automated end here.
 
-you will only stop if i force stop or terminate you. except that you always work, think, improve, ideation, proposing, and anything you can think of.
+you will only stop if i force stop or terminate you. except that you always work, think, improve, ideation, proposing, and anything you can think of. -->
+
+NEVER TOUCH THIS FILE. IVE SEEN YOU DO IT A COUPLE OF TIMES, IT CAUSES DRIFT ON THE AI AGENT.
+
+you decide when you going to stop. i recommend when 100% done & 100% confident for production deployment.
 
 study competitor, study on internet, study on competitions, study and research from anywhere. be creative, be explorative, be curious.
 
@@ -12,7 +16,7 @@ implementer only by subagents. chat's agent (main agent) must be an-orchestrator
 
 dumb / dead-ass simple task (like commit, push, github-related, wording, explore codebase, and many more) MUST use composer 2.5 fast. dont use other frontier models.
 
-### Always check this periodically (like 15 minutes or per epic)
+### Always check this periodically (like 10 minutes or per epic)
 
 - the user (King) will append anything you need to follow (update your memory index cache) in [here](HARNESS-ADDITIONAL-INSTRUCTIONS.md).
 - when you to stop? if [AGENTS_STOP_FILE](./AGENTS_STOP_FILE) exist.
@@ -20,12 +24,7 @@ dumb / dead-ass simple task (like commit, push, github-related, wording, explore
 
 ## Need human / user approval? Raise to [right-hand] of user
 
-spawn decision maker subagents of:
-
-- `claude-4.6-opus-medium`
-- `cursor-grok-4.5-medium`
-- `composer-2.5-fast`.
-- unavail? fallback to `auto` and skip that model retry if `auto` already used.
+spawn subagents of: `cursor-grok-4.5-medium`, `claude-4.6-opus-medium`, and `composer-2.5-fast` for decision maker.
 
 verbatim output format for [right-hand]:
 
