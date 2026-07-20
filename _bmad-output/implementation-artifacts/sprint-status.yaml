@@ -100,7 +100,7 @@ development_status:
   7-3-outbox-pending-and-failed-conflict-branches: done
   3-6-bulk-linear-push: done
   epic-3-retrospective: optional
-  7-4-linear-push-ux-single-palette-and-errors: backlog
+  7-4-linear-push-ux-single-palette-and-errors: review
   epic-7-retrospective: optional
   epic-5: in-progress  # E5 (launch)
   5-1-mcp-streamable-http-transport-and-auth: done

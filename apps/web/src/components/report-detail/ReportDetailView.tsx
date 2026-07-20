@@ -1,7 +1,8 @@
 "use client";
 
-import { Alert, Group, Stack, Tabs, Title } from "@mantine/core";
+import { Alert, Stack, Tabs, Title } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useRegisterSpotlightBridge } from "@/keyboard/spotlight-command-context";
 import { patchReportStatus } from "@/lib/reports/update-status-api";
 import { fetchReportDetail } from "@/lib/report-detail/client-api";
@@ -10,6 +11,9 @@ import { MetadataPanel } from "./MetadataPanel";
 import { NetworkPanel } from "./NetworkPanel";
 import { CommentsPanel } from "./CommentsPanel";
 import { ReplayViewer } from "./ReplayViewer";
+import { ReportDetailHeader } from "./ReportDetailHeader";
+import { useReportDetailHotkeys } from "@/keyboard/use-report-detail-hotkeys";
+import { pushReportToLinear } from "@/lib/reports/bulk-linear-push-api";
 
 export function ReportDetailView({
   reportId,
@@ -20,9 +24,15 @@ export function ReportDetailView({
 }) {
   const queryClient = useQueryClient();
 
+  const pushLinear = useCallback(async () => {
+    await pushReportToLinear(reportId);
+    await queryClient.invalidateQueries({ queryKey: ["report", reportId, "detail"] });
+  }, [queryClient, reportId]);
+
   useRegisterSpotlightBridge(
     {
       canEdit: true,
+      pushLinear,
       patchStatus: async (id, status) => {
         await patchReportStatus(id, status);
         await queryClient.invalidateQueries({ queryKey: ["report", reportId] });
@@ -32,12 +42,22 @@ export function ReportDetailView({
       selectedReportIds: [],
       workspaceSlug,
     },
-    [queryClient, reportId, workspaceSlug]
+    [pushLinear, queryClient, reportId, workspaceSlug]
   );
 
   const reportQuery = useQuery({
     queryFn: () => fetchReportDetail(reportId),
     queryKey: ["report", reportId, "detail"],
+  });
+
+  const reportReady =
+    Boolean(reportQuery.data) &&
+    reportQuery.data?.workspaceSlug === workspaceSlug;
+
+  useReportDetailHotkeys({
+    enabled: reportReady,
+    onPushLinear: pushLinear,
+    workspaceSlug,
   });
 
   if (reportQuery.isLoading) {
@@ -69,11 +89,15 @@ export function ReportDetailView({
     );
   }
 
+
   return (
     <Stack gap="md">
-      <Group justify="space-between">
-        <Title order={2}>{report.title}</Title>
-      </Group>
+      <ReportDetailHeader
+        linearIssueUrl={report.linearIssueUrl ?? null}
+        reportId={reportId}
+        title={report.title}
+        workspaceSlug={workspaceSlug}
+      />
       <Tabs defaultValue="replay">
         <Tabs.List>
           <Tabs.Tab value="replay">Replay</Tabs.Tab>

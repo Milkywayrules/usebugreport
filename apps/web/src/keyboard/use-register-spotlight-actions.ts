@@ -10,6 +10,7 @@ import { GLOBAL_SHORTCUTS, WORKSPACE_SPOTLIGHT_ACTIONS } from "@/keyboard/shortc
 import { useSpotlightCommandBridge } from "@/keyboard/spotlight-command-context";
 import { recordSpotlightRecent } from "@/keyboard/spotlight-recent";
 import type { ReportStatusValue } from "@/lib/reports/status";
+import { pushReportToLinear } from "@/lib/reports/bulk-linear-push-api";
 
 interface WorkspaceRow {
   id: string;
@@ -193,7 +194,19 @@ export function useRegisterSpotlightActions({
             keywords: ["linear", "push"],
           },
           () =>
-            notifications.show({ message: "Linear push ships in Epic E7." })
+            bridge.pushLinear?.() ??
+            (bridge.reportId
+              ? pushReportToLinear(bridge.reportId)
+                  .then(() =>
+                    notifications.show({ color: "green", message: "Pushed to Linear." })
+                  )
+                  .catch((error) =>
+                    notifications.show({
+                      color: "red",
+                      message: error instanceof Error ? error.message : "Linear push failed.",
+                    })
+                  )
+              : notifications.show({ message: "Open a report to push to Linear." }))
         ),
         withRecent(
           {
