@@ -11,6 +11,11 @@ type SessionHandlerContext = Parameters<typeof requireSession>[0];
 
 export interface WebCommentRouteDeps {
   commentService: CommentService;
+  onCommentCreated?: (input: {
+    commentId: string;
+    organizationId: string;
+    reportId: string;
+  }) => Promise<void>;
 }
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -33,7 +38,7 @@ export function registerWebCommentRoutes(
   deps: WebCommentRouteDeps
 ): unknown {
   const routeApp = app as Elysia;
-  const { commentService } = deps;
+  const { commentService, onCommentCreated } = deps;
 
   return routeApp
     .get("/api/web/reports/:reportId/comments", async (context) => {
@@ -121,10 +126,19 @@ export function registerWebCommentRoutes(
         const comment = await commentService.create(resolved, context.params.reportId, {
           body: body.body,
         });
+        if (comment.isNew && onCommentCreated) {
+          await onCommentCreated({
+            commentId: comment.id,
+            organizationId: resolved.organizationId,
+            reportId: context.params.reportId,
+          });
+        }
+
+        const { isNew: _isNew, createdAt, ...commentRest } = comment;
         return {
           data: {
-            ...comment,
-            createdAt: comment.createdAt.toISOString(),
+            ...commentRest,
+            createdAt: createdAt.toISOString(),
           },
           requestId: authResult.value.requestId,
         };

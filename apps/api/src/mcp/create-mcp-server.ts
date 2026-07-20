@@ -14,6 +14,11 @@ import { MCP_TOOL_REGISTRATIONS, type McpToolName } from "./tools/registry";
 export interface CreateMcpServerDeps {
   authContext: AuthContext;
   commentService: CommentService;
+  onCommentCreated?: (input: {
+    commentId: string;
+    organizationId: string;
+    reportId: string;
+  }) => Promise<void>;
   reportService: ReportService;
   searchService: SearchService;
 }
@@ -73,6 +78,7 @@ export function createMcpServer(deps: CreateMcpServerDeps): McpServer {
         {
           authContext: deps.authContext,
           commentService: deps.commentService,
+          onCommentCreated: deps.onCommentCreated,
         },
         args ?? {}
       );

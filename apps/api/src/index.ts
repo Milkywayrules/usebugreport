@@ -102,6 +102,28 @@ const integrationsQueue = createQueue(
   QUEUE_NAMES.INTEGRATIONS,
   integrationsLinearPushPayloadSchema
 );
+
+async function enqueueCommentCreatedWebhooks(input: {
+  commentId: string;
+  organizationId: string;
+  reportId: string;
+}) {
+  const hooks = await webhookService.listActiveEndpointsForEvent(
+    input.organizationId,
+    "report.comment.created"
+  );
+  for (const hook of hooks) {
+    await webhooksQueue.add(JOB_NAMES.WEBHOOKS_DISPATCH, {
+      commentId: input.commentId,
+      event: "report.comment.created",
+      eventId: `evt_comment_${input.commentId}_${Date.now()}`,
+      organizationId: input.organizationId,
+      reportId: input.reportId,
+      webhookId: hook.id,
+    });
+  }
+}
+
 const webhooksQueue = createQueue(
   QUEUE_NAMES.WEBHOOKS,
   webhooksDispatchPayloadSchema
@@ -328,12 +350,13 @@ const baseApp = new Elysia()
 const appWithMcp = registerCommentRoutes(
   registerMcpRoutes(baseApp, {
     commentService,
+    onCommentCreated: enqueueCommentCreatedWebhooks,
     reportService,
     resolveAuth: (authorization, requestId) =>
       resolveApiKeyFromRequest(db, authorization, requestId),
     searchService,
   }) as typeof baseApp,
-  { commentService }
+  { commentService, onCommentCreated: enqueueCommentCreatedWebhooks }
 ) as typeof baseApp;
 
 const appWithRoutes = registerLinearIntegrationRoutes(
@@ -379,7 +402,7 @@ const appWithRoutes = registerLinearIntegrationRoutes(
       projectService,
     }
   ),
-  { commentService }
+  { commentService, onCommentCreated: enqueueCommentCreatedWebhooks }
   ),
   { integrationService }
 ) as typeof baseApp;

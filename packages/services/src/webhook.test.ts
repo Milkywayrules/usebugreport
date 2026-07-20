@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { buildWebhookSignature, webhookTimestampSeconds } from "./webhook-sign";
-import { WEBHOOK_LAUNCH_EVENTS } from "./webhook";
+import { WEBHOOK_EVENTS, WEBHOOK_LAUNCH_EVENTS } from "./webhook";
 
 describe("webhook service constants", () => {
-  test("launch events include report.created and report.updated", () => {
+  test("webhook events include launch and comment.created", () => {
     expect(WEBHOOK_LAUNCH_EVENTS).toContain("report.created");
     expect(WEBHOOK_LAUNCH_EVENTS).toContain("report.updated");
+    expect(WEBHOOK_EVENTS).toContain("report.comment.created");
   });
 });
 

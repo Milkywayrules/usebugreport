@@ -1,5 +1,5 @@
 import type { DbClient } from "@usebugreport/db";
-import { reports, webhookDeliveries, webhookEndpoints } from "@usebugreport/db";
+import { reportComments, reports, webhookDeliveries, webhookEndpoints } from "@usebugreport/db";
 import { and, desc, eq } from "drizzle-orm";
 import { decryptSecret, encryptSecret } from "./crypto/secrets";
 import { generatePrefixedId } from "./project";
@@ -18,7 +18,15 @@ export const WEBHOOK_LAUNCH_EVENTS = [
   "report.updated",
 ] as const;
 
+export const WEBHOOK_FAST_FOLLOW_EVENTS = ["report.comment.created"] as const;
+
+export const WEBHOOK_EVENTS = [
+  ...WEBHOOK_LAUNCH_EVENTS,
+  ...WEBHOOK_FAST_FOLLOW_EVENTS,
+] as const;
+
 export type WebhookLaunchEvent = (typeof WEBHOOK_LAUNCH_EVENTS)[number];
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 export type WebhookDeliveryStatus = "delivered" | "failed" | "pending";
 
@@ -26,14 +34,14 @@ export const WEBHOOK_RETRY_DELAYS_MS = [0, 60_000, 300_000, 1_800_000, 7_200_000
 
 export interface RegisterWebhookInput {
   enabled?: boolean;
-  events: WebhookLaunchEvent[];
+  events: WebhookEvent[];
   url: string;
 }
 
 export interface WebhookEndpointRecord {
   createdAt: Date;
   enabled: boolean;
-  events: WebhookLaunchEvent[];
+  events: WebhookEvent[];
   id: string;
   organizationId: string;
   url: string;
@@ -45,7 +53,8 @@ export interface WebhookServiceDeps {
 }
 
 export interface WebhookDispatchInput {
-  event: WebhookLaunchEvent;
+  commentId?: string;
+  event: WebhookEvent;
   eventId: string;
   organizationId: string;
   reportId: string;
@@ -64,29 +73,49 @@ function assertHttpsUrl(url: string): void {
   }
 }
 
-function normalizeEvents(events: string[]): WebhookLaunchEvent[] {
+function normalizeEvents(events: string[]): WebhookEvent[] {
   if (events.length === 0) {
     throw new ServiceError("VALIDATION_ERROR", "At least one event is required.");
   }
   const invalid = events.filter(
-    (event) => !WEBHOOK_LAUNCH_EVENTS.includes(event as WebhookLaunchEvent)
+    (event) => !WEBHOOK_EVENTS.includes(event as WebhookEvent)
   );
   if (invalid.length > 0) {
     throw new ServiceError("VALIDATION_ERROR", "Unsupported webhook event.", {
       invalidEvents: invalid,
     });
   }
-  return events as WebhookLaunchEvent[];
+  return events as WebhookEvent[];
 }
 
 function mapRow(row: typeof webhookEndpoints.$inferSelect): WebhookEndpointRecord {
   return {
     createdAt: row.createdAt,
     enabled: row.enabled,
-    events: row.events as WebhookLaunchEvent[],
+    events: row.events as WebhookEvent[],
     id: row.id,
     organizationId: row.organizationId,
     url: row.url,
+  };
+}
+
+
+
+function serializeCommentPayload(comment: {
+  authorDisplayName: string;
+  authorType: string;
+  body: string;
+  createdAt: Date;
+  id: string;
+  reportId: string;
+}) {
+  return {
+    authorDisplayName: comment.authorDisplayName,
+    authorType: comment.authorType,
+    body: comment.body,
+    createdAt: comment.createdAt.toISOString(),
+    id: comment.id,
+    reportId: comment.reportId,
   };
 }
 
@@ -203,7 +232,7 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
 
     async listActiveEndpointsForEvent(
       organizationId: string,
-      event: WebhookLaunchEvent
+      event: WebhookEvent
     ): Promise<Array<{ id: string }>> {
       const rows = await db
         .select({ events: webhookEndpoints.events, id: webhookEndpoints.id })
@@ -215,7 +244,7 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
           )
         );
       return rows
-        .filter((row) => (row.events as WebhookLaunchEvent[]).includes(event))
+        .filter((row) => (row.events as WebhookEvent[]).includes(event))
         .map((row) => ({ id: row.id }));
     },
 
@@ -270,7 +299,7 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
         throw new ServiceError("VALIDATION_ERROR", "Webhook endpoint is disabled.");
       }
 
-      const events = endpoint.events as WebhookLaunchEvent[];
+      const events = endpoint.events as WebhookEvent[];
       if (!events.includes(input.event)) {
         throw new ServiceError("VALIDATION_ERROR", "Webhook endpoint does not subscribe to event.");
       }
@@ -298,11 +327,58 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
         throw new ServiceError("NOT_FOUND", "Report not found for webhook dispatch.");
       }
 
-      const payload = {
-        data: { report: serializeReportPayload(report) },
-        id: input.eventId,
-        type: input.event,
+      let payload: {
+        data: Record<string, unknown>;
+        id: string;
+        type: string;
       };
+
+      if (input.event === "report.comment.created") {
+        if (!input.commentId) {
+          throw new ServiceError(
+            "VALIDATION_ERROR",
+            "commentId is required for report.comment.created."
+          );
+        }
+
+        const [comment] = await db
+          .select({
+            authorDisplayName: reportComments.authorDisplayName,
+            authorType: reportComments.authorType,
+            body: reportComments.body,
+            createdAt: reportComments.createdAt,
+            id: reportComments.id,
+            reportId: reportComments.reportId,
+          })
+          .from(reportComments)
+          .where(
+            and(
+              eq(reportComments.id, input.commentId),
+              eq(reportComments.reportId, input.reportId),
+              eq(reportComments.organizationId, input.organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!comment) {
+          throw new ServiceError("NOT_FOUND", "Comment not found for webhook dispatch.");
+        }
+
+        payload = {
+          data: {
+            comment: serializeCommentPayload(comment),
+            report: serializeReportPayload(report),
+          },
+          id: input.eventId,
+          type: input.event,
+        };
+      } else {
+        payload = {
+          data: { report: serializeReportPayload(report) },
+          id: input.eventId,
+          type: input.event,
+        };
+      }
 
       const deliveryId = generatePrefixedId("whd");
       const now = new Date();

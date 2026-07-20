@@ -11,6 +11,11 @@ import {
 
 export interface CommentRouteDeps {
   commentService: CommentService;
+  onCommentCreated?: (input: {
+    commentId: string;
+    organizationId: string;
+    reportId: string;
+  }) => Promise<void>;
 }
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -44,7 +49,7 @@ export function registerCommentRoutes(
   deps: CommentRouteDeps
 ): unknown {
   const routeApp = app as Elysia;
-  const { commentService } = deps;
+  const { commentService, onCommentCreated } = deps;
 
   return routeApp.post(
     "/api/v1/reports/:reportId/comments",
@@ -95,10 +100,19 @@ export function registerCommentRoutes(
             dedupeKey: dedupeHeader,
           }
         );
+        if (comment.isNew && onCommentCreated) {
+          await onCommentCreated({
+            commentId: comment.id,
+            organizationId: access.ctx.organizationId,
+            reportId: context.params.reportId,
+          });
+        }
+
+        const { isNew: _isNew, createdAt, ...commentRest } = comment;
         return {
           data: {
-            ...comment,
-            createdAt: comment.createdAt.toISOString(),
+            ...commentRest,
+            createdAt: createdAt.toISOString(),
           },
           requestId: access.requestId,
         };

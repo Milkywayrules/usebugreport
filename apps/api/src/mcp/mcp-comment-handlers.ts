@@ -4,6 +4,11 @@ import { ServiceError } from "@usebugreport/services";
 export interface McpCommentHandlerDeps {
   authContext: AuthContext;
   commentService: CommentService;
+  onCommentCreated?: (input: {
+    commentId: string;
+    organizationId: string;
+    reportId: string;
+  }) => Promise<void>;
 }
 
 function jsonText(data: unknown) {
@@ -30,6 +35,14 @@ export async function handleMcpCreateComment(
     body,
     dedupeKey,
   });
+
+  if (comment.isNew && deps.onCommentCreated) {
+    await deps.onCommentCreated({
+      commentId: comment.id,
+      organizationId: deps.authContext.organizationId,
+      reportId,
+    });
+  }
 
   return jsonText({
     data: {
