@@ -20,9 +20,15 @@ import { auth, db, initAuth } from "./lib/auth";
 import { getEnv } from "./lib/env";
 import { serviceErrorToHttp } from "./lib/errors";
 import { readJsonBody } from "./lib/request-body";
+import { ROUTE_TAGS } from "./lib/route-tags";
 import { apiKeyAuthMiddleware } from "./middleware/api-key-auth";
 import { onboardingGateMiddleware } from "./middleware/onboarding-gate";
 import { requireSession, sessionMiddleware } from "./middleware/session";
+import { initApiLogger, loggingPlugin } from "./plugins/logging";
+import { observabilityPlugin } from "./plugins/observability";
+import { attachOpenapiRoutes } from "./plugins/openapi";
+import { platformErrorPlugin, requestIdPlugin } from "./plugins/platform-error";
+import { securityPlugin } from "./plugins/security";
 import { registerApiKeyRoutes } from "./routes/api-keys";
 import { registerCaptureRoutes } from "./routes/capture";
 import { registerProjectMemberRoutes } from "./routes/project-members";
@@ -31,6 +37,7 @@ import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWorkspaceRoutes } from "./routes/workspaces";
 
 initAuth();
+initApiLogger();
 const env = getEnv();
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -77,6 +84,11 @@ const captureIngestService = createCaptureIngestService(db, {
 });
 
 const baseApp = new Elysia()
+  .use(observabilityPlugin)
+  .use(securityPlugin)
+  .use(requestIdPlugin)
+  .use(loggingPlugin)
+  .use(platformErrorPlugin)
   .use(
     cors({
       allowedHeaders: [
@@ -84,8 +96,10 @@ const baseApp = new Elysia()
         "Authorization",
         "X-Ingest-Key",
         "Idempotency-Key",
+        "X-Request-Id",
       ],
       credentials: true,
+      exposeHeaders: ["X-Request-Id"],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       origin: env.APP_URL,
     })
@@ -94,111 +108,140 @@ const baseApp = new Elysia()
   .use(apiKeyAuthMiddleware)
   .use(onboardingGateMiddleware)
   .mount(auth.handler)
-  .get("/health", async () => {
-    try {
-      await db.execute(sql`select 1`);
-      return {
-        database: "ok",
-        services: servicesReady,
-        status: "ok",
-      };
-    } catch {
-      return {
-        database: "error",
-        services: servicesReady,
-        status: "degraded",
-      };
-    }
-  })
-  .get("/", () => ({ message: "usebugreport api" }))
-  .get("/api/v1/session", async (context) => {
-    const authResult = requireSession(context);
-    if (!authResult.ok) {
-      return jsonResponse(authResult.body, authResult.status);
-    }
-
-    const organizations = await (
-      auth.api as unknown as {
-        listOrganizations: (input: {
-          headers: Headers;
-        }) => Promise<unknown[] | null>;
+  .get(
+    "/health",
+    async () => {
+      try {
+        await db.execute(sql`select 1`);
+        return {
+          database: "ok",
+          services: servicesReady,
+          status: "ok",
+        };
+      } catch {
+        return {
+          database: "error",
+          services: servicesReady,
+          status: "degraded",
+        };
       }
-    ).listOrganizations({
-      headers: context.request.headers,
-    });
-
-    return {
-      organizations: organizations ?? [],
-      requestId: authResult.value.requestId,
-      session: authResult.value.session,
-      user: authResult.value.user,
-    };
+    },
+    {
+      detail: {
+        hide: true,
+        tags: [ROUTE_TAGS.ops],
+      },
+    }
+  )
+  .get("/", () => ({ message: "usebugreport api" }), {
+    detail: { hide: true },
   })
-  .post("/api/v1/onboarding/workspace", async (context) => {
-    const authResult = requireSession(context);
-    if (!authResult.ok) {
-      return jsonResponse(authResult.body, authResult.status);
-    }
+  .get(
+    "/api/v1/session",
+    async (context) => {
+      const authResult = requireSession(context);
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
 
-    const body = readJsonBody<{
-      name?: string;
-      projectName?: string;
-      slug?: string;
-    }>(context.body);
-    if (!body) {
-      return jsonResponse(
-        {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "Invalid request body.",
-            requestId: authResult.value.requestId,
-          },
-        },
-        422
-      );
-    }
+      const organizations = await (
+        auth.api as unknown as {
+          listOrganizations: (input: {
+            headers: Headers;
+          }) => Promise<unknown[] | null>;
+        }
+      ).listOrganizations({
+        headers: context.request.headers,
+      });
 
-    try {
-      const ctx = {
-        organizationId: "",
+      return {
+        organizations: organizations ?? [],
         requestId: authResult.value.requestId,
-        type: "session" as const,
-        userId: authResult.value.user.id,
+        session: authResult.value.session,
+        user: authResult.value.user,
       };
+    },
+    {
+      detail: {
+        hide: true,
+        tags: [ROUTE_TAGS.sessionBff],
+      },
+    }
+  )
+  .post(
+    "/api/v1/onboarding/workspace",
+    async (context) => {
+      const authResult = requireSession(context);
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
 
-      const organization = await workspaceService.createWorkspace(
-        ctx,
-        { name: body.name ?? "", slug: body.slug },
-        context.request.headers
-      );
-
-      let project:
-        | Awaited<ReturnType<typeof projectService.createProject>>["project"]
-        | undefined;
-      let ingestKeyPlaintext: string | undefined;
-
-      const projectName = body.projectName?.trim();
-      if (projectName) {
-        const created = await projectService.createProject(
+      const body = readJsonBody<{
+        name?: string;
+        projectName?: string;
+        slug?: string;
+      }>(context.body);
+      if (!body) {
+        return jsonResponse(
           {
-            ...ctx,
-            organizationId: organization.id,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Invalid request body.",
+              requestId: authResult.value.requestId,
+            },
           },
-          { name: projectName }
+          422
         );
-        ({ ingestKeyPlaintext, project } = created);
       }
 
-      return {
-        ingestKeyPlaintext,
-        organization: { id: organization.id, slug: organization.slug },
-        project,
-        requestId: authResult.value.requestId,
-      };
-    } catch (error) {
-      return handleServiceError(error, authResult.value.requestId);
+      try {
+        const ctx = {
+          organizationId: "",
+          requestId: authResult.value.requestId,
+          type: "session" as const,
+          userId: authResult.value.user.id,
+        };
+
+        const organization = await workspaceService.createWorkspace(
+          ctx,
+          { name: body.name ?? "", slug: body.slug },
+          context.request.headers
+        );
+
+        let project:
+          | Awaited<ReturnType<typeof projectService.createProject>>["project"]
+          | undefined;
+        let ingestKeyPlaintext: string | undefined;
+
+        const projectName = body.projectName?.trim();
+        if (projectName) {
+          const created = await projectService.createProject(
+            {
+              ...ctx,
+              organizationId: organization.id,
+            },
+            { name: projectName }
+          );
+          ({ ingestKeyPlaintext, project } = created);
+        }
+
+        return {
+          ingestKeyPlaintext,
+          organization: { id: organization.id, slug: organization.slug },
+          project,
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    },
+    {
+      detail: {
+        hide: true,
+        tags: [ROUTE_TAGS.onboarding],
+      },
     }
-  });
+  );
 
 const appWithRoutes = registerCaptureRoutes(
   registerApiKeyRoutes(
@@ -214,26 +257,71 @@ const appWithRoutes = registerCaptureRoutes(
   }
 ) as typeof baseApp;
 
-let app = appWithRoutes as typeof baseApp;
+const appWithProbes =
+  process.env.NODE_ENV === "production"
+    ? appWithRoutes.get(
+        "/api/v1/protected-probe",
+        (context) => {
+          if (process.env.NODE_ENV === "production") {
+            return new Response(null, { status: 404 });
+          }
 
-app = app.get("/api/v1/protected-probe", (context) => {
-  if (process.env.NODE_ENV === "production") {
-    return new Response(null, { status: 404 });
-  }
+          const authResult = requireSession(context);
+          if (!authResult.ok) {
+            return jsonResponse(authResult.body, authResult.status);
+          }
 
-  const authResult = requireSession(
-    context as unknown as Parameters<typeof requireSession>[0]
-  );
-  if (!authResult.ok) {
-    return jsonResponse(authResult.body, authResult.status);
-  }
+          return { ok: true };
+        },
+        {
+          detail: {
+            hide: true,
+            tags: [ROUTE_TAGS.internalDev],
+          },
+        }
+      )
+    : appWithRoutes
+        .get(
+          "/api/v1/protected-probe",
+          (context) => {
+            if (process.env.NODE_ENV === "production") {
+              return new Response(null, { status: 404 });
+            }
 
-  return { ok: true };
-}) as unknown as typeof baseApp;
+            const authResult = requireSession(context);
+            if (!authResult.ok) {
+              return jsonResponse(authResult.body, authResult.status);
+            }
 
-export { app };
+            return { ok: true };
+          },
+          {
+            detail: {
+              hide: true,
+              tags: [ROUTE_TAGS.internalDev],
+            },
+          }
+        )
+        .get(
+          "/api/v1/_test/platform/error",
+          () => {
+            throw new Error("platform test error");
+          },
+          {
+            detail: {
+              hide: true,
+              tags: [ROUTE_TAGS.internalDev],
+            },
+          }
+        );
+
+const coreApp = attachOpenapiRoutes(
+  appWithProbes as unknown as Elysia
+) as unknown as typeof appWithProbes;
+
+export { coreApp as app };
 
 if (import.meta.main) {
   const port = Number(process.env.PORT ?? 3001);
-  app.listen({ hostname: "0.0.0.0", port });
+  coreApp.listen({ hostname: "0.0.0.0", port });
 }
