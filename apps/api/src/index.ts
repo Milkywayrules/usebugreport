@@ -29,6 +29,7 @@ import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { auth, db, initAuth } from "./lib/auth";
 import { getEnv } from "./lib/env";
+import { runtimeEnv } from "./runtime-env";
 import { serviceErrorToHttp } from "./lib/errors";
 import { renderPrometheusMetrics } from "./lib/metrics";
 import { readJsonBody } from "./lib/request-body";
@@ -421,11 +422,11 @@ const appWithRoutes = registerGitHubIntegrationRoutes(
 ) as typeof baseApp;
 
 const appWithProbes =
-  process.env.NODE_ENV === "production"
+  runtimeEnv.NODE_ENV === "production"
     ? appWithRoutes.get(
         "/api/v1/protected-probe",
         (context) => {
-          if (process.env.NODE_ENV === "production") {
+          if (runtimeEnv.NODE_ENV === "production") {
             return new Response(null, { status: 404 });
           }
 
@@ -447,7 +448,7 @@ const appWithProbes =
         .get(
           "/api/v1/protected-probe",
           (context) => {
-            if (process.env.NODE_ENV === "production") {
+            if (runtimeEnv.NODE_ENV === "production") {
               return new Response(null, { status: 404 });
             }
 
@@ -485,6 +486,6 @@ const coreApp = attachOpenapiRoutes(
 export { coreApp as app };
 
 if (import.meta.main) {
-  const port = Number(process.env.PORT ?? 3001);
+  const port = runtimeEnv.PORT;
   coreApp.listen({ hostname: "0.0.0.0", port });
 }

@@ -21,6 +21,7 @@
         "@elysiajs/openapi": "^1.4.15",
         "@elysiajs/opentelemetry": "^1.4.11",
         "@modelcontextprotocol/sdk": "1.29.0",
+        "@t3-oss/env-core": "^0.13.8",
         "@usebugreport/config": "workspace:*",
         "@usebugreport/contracts": "workspace:*",
         "@usebugreport/db": "workspace:*",

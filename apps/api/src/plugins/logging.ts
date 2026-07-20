@@ -1,10 +1,11 @@
 import { createServiceLogger } from "@usebugreport/telemetry";
 import { Elysia } from "elysia";
 import { evlog } from "evlog/elysia";
+import { runtimeEnv } from "../runtime-env";
 
 export function initApiLogger(): void {
   createServiceLogger({
-    environment: process.env.NODE_ENV ?? "development",
+    environment: runtimeEnv.NODE_ENV,
     service: "usebugreport-api",
   });
 }

@@ -1,5 +1,7 @@
 import { createApiKeyService, ServiceError } from "@usebugreport/services";
 import type { Elysia } from "elysia";
+
+import { runtimeEnv } from "../runtime-env";
 import { db } from "../lib/auth";
 import { serviceErrorToHttp } from "../lib/errors";
 import { readJsonBody } from "../lib/request-body";
@@ -197,7 +199,7 @@ export function registerApiKeyRoutes(app: unknown): unknown {
       }
     )
     .get("/api/v1/auth/context-probe", async (context) => {
-      if (process.env.NODE_ENV === "production") {
+      if (runtimeEnv.NODE_ENV === "production") {
         return new Response(null, { status: 404 });
       }
 
@@ -285,7 +287,7 @@ export function registerApiKeyRoutes(app: unknown): unknown {
       };
     })
     .get("/api/v1/auth/scope-probe/:scope", async (context) => {
-      if (process.env.NODE_ENV === "production") {
+      if (runtimeEnv.NODE_ENV === "production") {
         return new Response(null, { status: 404 });
       }
 

@@ -1,4 +1,6 @@
 import { opentelemetry } from "@elysiajs/opentelemetry";
+
+import { runtimeEnv } from "../runtime-env";
 import {
   isDevConsoleSpanDumpEnabled,
   isOtelEnabled,
@@ -8,7 +10,7 @@ import { Elysia } from "elysia";
 export const observabilityPlugin = isOtelEnabled()
   ? new Elysia({ name: "observability" }).use(
       opentelemetry({
-        serviceName: process.env.OTEL_SERVICE_NAME ?? "usebugreport-api",
+        serviceName: runtimeEnv.OTEL_SERVICE_NAME,
         ...(isDevConsoleSpanDumpEnabled()
           ? {
               instrumentations: [],
