@@ -52,6 +52,7 @@ export interface SessionFixture {
 async function truncateAuthTables(db: ReturnType<typeof createDbClient>) {
   await db.execute(sql`
     truncate table
+      workspace_api_keys,
       project_members,
       ingest_keys,
       projects,

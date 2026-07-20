@@ -8,7 +8,7 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { generatePrefixedId } from "./project";
 import type { AuthContext, ServiceErrorCode } from "./types";
-import { ServiceError } from "./types";
+import { requireSessionUserId, ServiceError } from "./types";
 import type { UsageService } from "./usage";
 
 const MAX_PINNED_WORKSPACES = 9;
@@ -109,13 +109,15 @@ export function createWorkspaceService(
 
       const slug = input.slug?.trim() || slugifyWorkspaceName(trimmedName);
 
+      const userId = requireSessionUserId(ctx);
+
       return db.transaction(async (tx) => {
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtext(${ctx.userId}))`
+          sql`select pg_advisory_xact_lock(hashtext(${userId}))`
         );
 
         const tierCheck = await deps.usageService.checkTierLimit(
-          { organizationId: "", userId: ctx.userId },
+          { organizationId: "", userId },
           "workspaces"
         );
 
@@ -145,7 +147,7 @@ export function createWorkspaceService(
             id: memberId,
             organizationId,
             role: "owner",
-            userId: ctx.userId,
+            userId,
           });
 
           return { id: organizationId, name: trimmedName, slug };
@@ -158,8 +160,9 @@ export function createWorkspaceService(
     },
 
     async getPinnedPreferences(ctx: AuthContext) {
+      const userId = requireSessionUserId(ctx);
       const row = await db.query.userPreferences.findFirst({
-        where: eq(userPreferences.userId, ctx.userId),
+        where: eq(userPreferences.userId, userId),
       });
 
       return {
@@ -169,6 +172,7 @@ export function createWorkspaceService(
     },
 
     async listWorkspacesForUser(ctx: AuthContext) {
+      const userId = requireSessionUserId(ctx);
       const rows = await db
         .select({
           billingTier: organization.billingTier,
@@ -180,17 +184,28 @@ export function createWorkspaceService(
         })
         .from(member)
         .innerJoin(organization, eq(member.organizationId, organization.id))
-        .where(eq(member.userId, ctx.userId))
+        .where(eq(member.userId, userId))
         .orderBy(organization.createdAt);
 
       return rows;
     },
 
-    requireOrgAdmin: (ctx: AuthContext, organizationId: string) =>
-      requireOrgAdmin(db, ctx.userId, organizationId),
+    requireOrgAdmin: (ctx: AuthContext, organizationId: string) => {
+      if (!ctx.userId) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "Organization admin access required."
+        );
+      }
+      return requireOrgAdmin(db, ctx.userId, organizationId);
+    },
 
-    requireOrgMember: (ctx: AuthContext, organizationId: string) =>
-      requireOrgMember(db, ctx.userId, organizationId),
+    requireOrgMember: (ctx: AuthContext, organizationId: string) => {
+      if (!ctx.userId) {
+        throw new ServiceError("NOT_FOUND", "Workspace not found.");
+      }
+      return requireOrgMember(db, ctx.userId, organizationId);
+    },
 
     async updatePinnedPreferences(
       ctx: AuthContext,
@@ -199,6 +214,8 @@ export function createWorkspaceService(
         pinnedWorkspaceIds: string[];
       }
     ) {
+      const userId = requireSessionUserId(ctx);
+
       if (input.pinnedWorkspaceIds.length > MAX_PINNED_WORKSPACES) {
         throw new ServiceError(
           "VALIDATION_ERROR",
@@ -209,7 +226,7 @@ export function createWorkspaceService(
 
       const memberships = await db.query.member.findMany({
         columns: { organizationId: true },
-        where: eq(member.userId, ctx.userId),
+        where: eq(member.userId, userId),
       });
       const allowedIds = new Set(memberships.map((row) => row.organizationId));
 
@@ -229,7 +246,7 @@ export function createWorkspaceService(
         .values({
           pinnedOrder,
           pinnedWorkspaceIds: input.pinnedWorkspaceIds,
-          userId: ctx.userId,
+          userId,
         })
         .onConflictDoUpdate({
           set: {
@@ -254,7 +271,7 @@ export function createWorkspaceService(
         throw new ServiceError("NOT_FOUND", "Workspace not found.");
       }
 
-      await requireOrgAdmin(db, ctx.userId, organizationId);
+      await requireOrgAdmin(db, requireSessionUserId(ctx), organizationId);
 
       const trimmedName = input.name?.trim();
       if (!trimmedName) {

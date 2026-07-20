@@ -28,6 +28,8 @@ import {
   userPreferencesRelations,
   userRelations,
   verification,
+  workspaceApiKeys,
+  workspaceApiKeysRelations,
   workspaceUsageMonthly,
   workspaceUsageMonthlyRelations,
 } from "./schema/index";
@@ -60,6 +62,8 @@ export const schema = {
   userPreferencesRelations,
   userRelations,
   verification,
+  workspaceApiKeys,
+  workspaceApiKeysRelations,
   workspaceUsageMonthly,
   workspaceUsageMonthlyRelations,
 };
