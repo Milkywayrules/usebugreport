@@ -149,4 +149,3 @@ export async function getObject(
   const bytes = await result.Body.transformToByteArray();
   return new Uint8Array(bytes);
 }
-

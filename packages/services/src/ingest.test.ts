@@ -11,8 +11,18 @@ import {
 import type { IngestFinalizePayload } from "@usebugreport/queue";
 import { eq, sql } from "drizzle-orm";
 import { buildIngestR2Key, createCaptureIngestService } from "./ingest";
-import { createUsageService } from "./usage";
 import { createProjectService } from "./project";
+import { createUsageService } from "./usage";
+
+function contentTypeForTestKey(key: string): string {
+  if (key.endsWith(".webp")) {
+    return "image/webp";
+  }
+  if (key.endsWith("/meta.json")) {
+    return "application/json";
+  }
+  return "application/gzip";
+}
 
 describe("buildIngestR2Key", () => {
   test("builds layout per architecture section 7", () => {
@@ -137,10 +147,10 @@ runDbTests("CaptureIngestService", () => {
             return Promise.resolve(
               new TextEncoder().encode(
                 JSON.stringify({
-                  url: "https://app.test/page",
-                  userAgent: "test-agent",
                   browser: { name: "Chrome", version: "120" },
                   os: { name: "Linux" },
+                  url: "https://app.test/page",
+                  userAgent: "test-agent",
                 })
               )
             );
@@ -150,11 +160,7 @@ runDbTests("CaptureIngestService", () => {
         headObject: (key) =>
           Promise.resolve({
             contentLength: key.endsWith("/meta.json") ? 64 : 3,
-            contentType: key.endsWith(".webp")
-              ? "image/webp"
-              : key.endsWith("/meta.json")
-                ? "application/json"
-                : "application/gzip",
+            contentType: contentTypeForTestKey(key),
           }),
         presignPut: (key, contentType) =>
           Promise.resolve(
@@ -405,7 +411,6 @@ runDbTests("CaptureIngestService", () => {
     expect(putCalls).toHaveLength(4);
     expect(enqueued).toHaveLength(1);
   });
-
 
   test("processFinalizeJob writes blobs, completes report, increments usage", async () => {
     const { service } = createService({ generateId: () => "rpt_finalize_1" });

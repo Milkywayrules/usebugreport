@@ -68,7 +68,6 @@ describe("R2 putObject", () => {
     expect(command.input.Body).toBe(body);
   });
 
-
   test("headObject returns content length and type", async () => {
     sendMock.mockImplementationOnce(() =>
       Promise.resolve({ ContentLength: 42, ContentType: "application/gzip" })
