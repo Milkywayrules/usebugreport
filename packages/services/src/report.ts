@@ -47,10 +47,34 @@ function gunzipJson(bytes: Uint8Array): unknown {
   return JSON.parse(json.toString("utf8"));
 }
 
+const REPORT_STATUSES: ReportRecord["status"][] = [
+  "open",
+  "in_progress",
+  "resolved",
+  "closed",
+  "duplicate",
+];
+
 function assertReportsReadScope(ctx: AuthContext): void {
   if (ctx.type === "api_key") {
     requireApiKeyScope(ctx, "reports:read");
   }
+}
+
+function assertReportsWriteScope(ctx: AuthContext): void {
+  if (ctx.type === "api_key") {
+    requireApiKeyScope(ctx, "reports:write");
+  }
+}
+
+function parseReportStatus(value: unknown): ReportRecord["status"] {
+  if (
+    typeof value === "string" &&
+    (REPORT_STATUSES as string[]).includes(value)
+  ) {
+    return value as ReportRecord["status"];
+  }
+  throw new ServiceError("VALIDATION_ERROR", "Invalid report status.");
 }
 
 
@@ -335,6 +359,72 @@ export function createReportService(db: DbClient, deps: ReportServiceDeps) {
         },
       };
     },
+
+    async updateStatus(
+      ctx: AuthContext,
+      reportId: string,
+      status: ReportRecord["status"]
+    ): Promise<ReportRecord> {
+      assertReportsWriteScope(ctx);
+      parseReportStatus(status);
+
+      const [row] = await db
+        .select({
+          createdAt: reports.createdAt,
+          description: reports.description,
+          environment: reports.environment,
+          id: reports.id,
+          ingestStatus: reports.ingestStatus,
+          organizationId: reports.organizationId,
+          projectId: reports.projectId,
+          status: reports.status,
+          summary: reports.summary,
+          summaryText: reports.summaryText,
+          title: reports.title,
+          updatedAt: reports.updatedAt,
+        })
+        .from(reports)
+        .where(
+          and(
+            eq(reports.id, reportId),
+            eq(reports.organizationId, ctx.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!row) {
+        throw new ServiceError("NOT_FOUND", "Report not found.");
+      }
+
+      if (ctx.type === "session") {
+        const canUpdate = await rbac.canPerform(
+          ctx,
+          row.projectId,
+          "linear:push"
+        );
+        if (!canUpdate) {
+          throw new ServiceError(
+            "FORBIDDEN",
+            "Insufficient project permissions."
+          );
+        }
+      }
+
+      const updatedAt = new Date();
+      await db
+        .update(reports)
+        .set({ status, updatedAt })
+        .where(eq(reports.id, reportId));
+
+      return {
+        ...row,
+        environment: (row.environment ?? {}) as Record<string, unknown>,
+        status,
+        summary: (row.summary ?? {}) as Record<string, unknown>,
+        updatedAt,
+      };
+    },
+
 
     async getSummary(
       ctx: AuthContext,

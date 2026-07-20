@@ -206,6 +206,24 @@ runDbTests("ReportService", () => {
     expect(logs).toEqual([{ level: "error", message: "boom" }]);
   });
 
+  test("updateStatus changes report status for authorized member", async () => {
+    const r2 = {
+      getObject: () => Promise.resolve(new Uint8Array()),
+      presignGet: (key: string) => Promise.resolve(`https://get.test/${key}`),
+    };
+    const reportService = createReportService(db, { r2 });
+
+    const updated = await reportService.updateStatus(
+      sessionCtx(),
+      reportId,
+      "resolved"
+    );
+    expect(updated.status).toBe("resolved");
+
+    const row = await reportService.getById(sessionCtx(), reportId);
+    expect(row.status).toBe("resolved");
+  });
+
   test("getReplayManifest returns presigned replay batches", async () => {
     const presigned: string[] = [];
     const r2 = {
