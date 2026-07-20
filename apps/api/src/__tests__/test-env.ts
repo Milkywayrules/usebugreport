@@ -15,6 +15,10 @@ export const testEnvDefaults = {
 } as const;
 
 export function applyTestEnv(): void {
+  if (process.env.RESEND_API_KEY === "") {
+    delete process.env.RESEND_API_KEY;
+  }
+
   for (const [key, value] of Object.entries(testEnvDefaults)) {
     process.env[key] ??= value;
   }
