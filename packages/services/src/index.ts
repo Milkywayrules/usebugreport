@@ -102,6 +102,10 @@ export {
 } from "./webhook";
 export { buildWebhookSignature, webhookTimestampSeconds } from "./webhook-sign";
 export {
+  assertWebhookHostSafe,
+  isBlockedIpAddress,
+} from "./webhook-ssrf";
+export {
   createWorkspaceService,
   MAX_PINNED_WORKSPACES,
   slugifyWorkspaceName,

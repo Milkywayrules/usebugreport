@@ -7,6 +7,7 @@ import type { AuthContext } from "./types";
 import { ServiceError } from "./types";
 import type { UsageService } from "./usage";
 import { postWebhookPayload } from "./webhook-delivery-http";
+import { assertWebhookHostSafe } from "./webhook-ssrf";
 import {
   buildWebhookSignature,
   webhookTimestampSeconds,
@@ -147,6 +148,7 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
       }
 
       assertHttpsUrl(input.url);
+      await assertWebhookHostSafe(new URL(input.url).hostname);
       const events = normalizeEvents(input.events);
 
       const secretPlaintext = crypto.randomUUID().replace(/-/g, "");
@@ -280,6 +282,19 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
         "X-UseBugReport-Signature": signature,
         "X-UseBugReport-Timestamp": timestamp,
       }, rawBody);
+
+      if (result.ssrfBlocked) {
+        await db
+          .update(webhookDeliveries)
+          .set({
+            attempts: attemptNumber,
+            lastResponseCode: null,
+            nextAttemptAt: null,
+            status: "failed",
+          })
+          .where(eq(webhookDeliveries.id, deliveryId));
+        return {};
+      }
 
       const success =
         result.responseCode !== null &&

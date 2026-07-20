@@ -109,8 +109,8 @@ development_status:
   epic-5-retrospective: optional
   epic-8: in-progress  # E8 (launch)
   8-1-webhook-registration-with-pro-tier-gate: done
-  8-2-webhook-dispatch-and-hmac-delivery: review
-  8-3-ssrf-controls-with-ip-pinning-at-delivery: backlog
+  8-2-webhook-dispatch-and-hmac-delivery: done
+  8-3-ssrf-controls-with-ip-pinning-at-delivery: review
   8-4-webhook-debug-ui: backlog
   epic-8-retrospective: optional
   epic-9: backlog  # E9 (launch)
