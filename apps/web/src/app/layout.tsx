@@ -1,5 +1,6 @@
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
+import "@mantine/spotlight/styles.css";
 import { ColorSchemeScript } from "@mantine/core";
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
