@@ -27,6 +27,7 @@
         "@usebugreport/queue": "workspace:*",
         "@usebugreport/services": "workspace:*",
         "@usebugreport/storage": "workspace:*",
+        "@usebugreport/telemetry": "workspace:*",
         "better-auth": "^1.2.0",
         "drizzle-orm": "^0.38.0",
         "elysia": "^1.4.0",
@@ -75,6 +76,7 @@
         "@usebugreport/queue": "workspace:*",
         "@usebugreport/services": "workspace:*",
         "@usebugreport/storage": "workspace:*",
+        "@usebugreport/telemetry": "workspace:*",
         "bullmq": "^5.40.0",
       },
       "devDependencies": {
@@ -191,6 +193,16 @@
         "@aws-sdk/client-s3": "^3.787.0",
         "@aws-sdk/s3-request-presigner": "^3.787.0",
         "@usebugreport/config": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.8.0",
+      },
+    },
+    "packages/telemetry": {
+      "name": "@usebugreport/telemetry",
+      "version": "0.0.0",
+      "dependencies": {
+        "evlog": "^2.22.0",
       },
       "devDependencies": {
         "typescript": "^5.8.0",
@@ -673,6 +685,8 @@
     "@usebugreport/services": ["@usebugreport/services@workspace:packages/services"],
 
     "@usebugreport/storage": ["@usebugreport/storage@workspace:packages/storage"],
+
+    "@usebugreport/telemetry": ["@usebugreport/telemetry@workspace:packages/telemetry"],
 
     "@usebugreport/web": ["@usebugreport/web@workspace:apps/web"],
 
