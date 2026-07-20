@@ -238,10 +238,13 @@ export function registerLinearIntegrationRoutes(
         );
       }
 
+      const body = await readJsonBody<{ retry?: boolean }>(context.request);
+
       try {
         const data = await integrationService.pushReportToLinear(
           resolved,
-          context.params.reportId
+          context.params.reportId,
+          { retry: body?.retry === true }
         );
         return {
           data,
