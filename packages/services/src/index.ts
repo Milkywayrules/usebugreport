@@ -14,6 +14,8 @@ export {
   type CaptureIngestServiceDeps,
   createCaptureIngestService,
   type IngestPartName,
+  type InlineIngestInput,
+  type InlineIngestPart,
   type PresignPartInput,
   type PresignUploadInput,
 } from "./ingest";
