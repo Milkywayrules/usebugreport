@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 20:00"
+last_updated: "2026-07-20 20:15"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -77,13 +77,13 @@ development_status:
   2-5-reportservice-metadata-reads-and-replay-manifest: done
   2-6-usage-quotas-and-ingest-rate-limits: done
   2-7-retention-sweep-and-stale-pending-cleanup: done
-  2-8-worker-container-ops-memory-rss-concurrency-graceful-shutdown: backlog
+  2-8-worker-container-ops-memory-rss-concurrency-graceful-shutdown: done
   epic-2-retrospective: optional
   1-5-sdk-submit-widget-shadow-dom: done
   epic-1-retrospective: optional
   3-2-onboarding-wizard: done
   3-4-dense-report-list-with-keyboard-navigation: done
-  3-7-report-detail-and-replay-viewer: review
+  3-7-report-detail-and-replay-viewer: done
   3-10-central-keyboard-shortcuts-registry: backlog  # AD-10 registry before E3-S9 palette
   3-5-bulk-status-change: backlog
   3-8-human-web-comments-fr-26-lg-2: backlog
