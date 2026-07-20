@@ -1,0 +1,27 @@
+{
+  "name": "@usebugreport/billing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "bun test src",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@usebugreport/config": "workspace:*",
+    "@usebugreport/db": "workspace:*",
+    "drizzle-orm": "^0.38.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

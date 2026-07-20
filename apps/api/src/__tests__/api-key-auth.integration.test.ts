@@ -9,10 +9,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { applyTestEnv, hasDatabaseUrl } from "./test-env";
 
-const databaseUrl = process.env.DATABASE_URL;
-const runIntegration = hasDatabaseUrl() ? describe : describe.skip;
-
-runIntegration("api key auth integration", () => {
+describe.skipIf(!hasDatabaseUrl())("api key auth integration", () => {
   let app: typeof import("../index").app;
   let db: typeof import("../lib/auth").db;
   let apiKeyService: import("@usebugreport/services").ApiKeyService;
@@ -29,7 +26,7 @@ runIntegration("api key auth integration", () => {
   const memberUser = "user_key_member";
 
   beforeAll(async () => {
-    if (!databaseUrl) {
+    if (!hasDatabaseUrl()) {
       return;
     }
 

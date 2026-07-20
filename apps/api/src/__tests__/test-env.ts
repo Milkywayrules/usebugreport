@@ -1,3 +1,6 @@
+export const testDatabaseUrl =
+  "postgresql://test:test@127.0.0.1:5432/usebugreport_test";
+
 export const testEnvDefaults = {
   API_URL: "http://localhost:3001",
   APP_URL: "http://localhost:3000",
@@ -24,7 +27,11 @@ export function applyTestEnv(): void {
   }
 }
 
-/** Integration tests run only when DATABASE_URL is explicitly provided. */
+/** Integration tests run only when RUN_INTEGRATION_TESTS=1 and DATABASE_URL is set. */
 export function hasDatabaseUrl(): boolean {
+  if (process.env.RUN_INTEGRATION_TESTS !== "1") {
+    return false;
+  }
+
   return Boolean(process.env.DATABASE_URL?.trim());
 }
