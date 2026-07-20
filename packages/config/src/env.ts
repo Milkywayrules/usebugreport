@@ -19,6 +19,8 @@ export const envSchema = z.object({
   REDIS_URL: z.string().min(1),
   RESEND_API_KEY: z.string().min(1).optional(),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(8),
+  WORKER_DRAIN_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  WORKER_MEMORY_LIMIT_MB: z.coerce.number().int().positive().default(2048),
 });
 
 export type Env = z.infer<typeof envSchema>;
