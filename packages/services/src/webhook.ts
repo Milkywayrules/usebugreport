@@ -1,6 +1,6 @@
 import type { DbClient } from "@usebugreport/db";
 import { reports, webhookDeliveries, webhookEndpoints } from "@usebugreport/db";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { decryptSecret, encryptSecret } from "./crypto/secrets";
 import { generatePrefixedId } from "./project";
 import type { AuthContext } from "./types";
@@ -110,8 +110,89 @@ function serializeReportPayload(report: {
   };
 }
 
+
+
+export function formatWebhookDeliveryError(input: {
+  attempts: number;
+  lastResponseCode: number | null;
+  status: WebhookDeliveryStatus | string;
+}): string | null {
+  if (input.status === "delivered") {
+    return null;
+  }
+  if (input.status === "pending") {
+    return "Delivery pending or scheduled for retry.";
+  }
+  if (input.lastResponseCode === null) {
+    return "Delivery failed without an HTTP response (timeout, TLS, or blocked host).";
+  }
+  return `HTTP ${input.lastResponseCode} after ${input.attempts} attempt(s).`;
+}
+
+function assertWebhookAdmin(ctx: AuthContext): void {
+  if (ctx.orgRole !== "owner" && ctx.orgRole !== "admin") {
+    throw new ServiceError("FORBIDDEN", "Organization admin access required.");
+  }
+}
+
 export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
   return {
+
+    async listDeliveries(
+      ctx: AuthContext,
+      limit = 50
+    ): Promise<
+      Array<{
+        attempts: number;
+        createdAt: Date;
+        endpointId: string;
+        endpointUrl: string;
+        errorSummary: string | null;
+        event: string;
+        id: string;
+        lastResponseCode: number | null;
+        status: WebhookDeliveryStatus;
+      }>
+    > {
+      assertWebhookAdmin(ctx);
+      const cappedLimit = Math.min(Math.max(limit, 1), 100);
+      const rows = await db
+        .select({
+          attempts: webhookDeliveries.attempts,
+          createdAt: webhookDeliveries.createdAt,
+          endpointId: webhookDeliveries.endpointId,
+          endpointUrl: webhookEndpoints.url,
+          event: webhookDeliveries.event,
+          id: webhookDeliveries.id,
+          lastResponseCode: webhookDeliveries.lastResponseCode,
+          status: webhookDeliveries.status,
+        })
+        .from(webhookDeliveries)
+        .innerJoin(
+          webhookEndpoints,
+          eq(webhookDeliveries.endpointId, webhookEndpoints.id)
+        )
+        .where(eq(webhookEndpoints.organizationId, ctx.organizationId))
+        .orderBy(desc(webhookDeliveries.createdAt))
+        .limit(cappedLimit);
+
+      return rows.map((row) => ({
+        attempts: row.attempts,
+        createdAt: row.createdAt,
+        endpointId: row.endpointId,
+        endpointUrl: row.endpointUrl,
+        errorSummary: formatWebhookDeliveryError({
+          attempts: row.attempts,
+          lastResponseCode: row.lastResponseCode,
+          status: row.status as WebhookDeliveryStatus,
+        }),
+        event: row.event,
+        id: row.id,
+        lastResponseCode: row.lastResponseCode,
+        status: row.status as WebhookDeliveryStatus,
+      }));
+    },
+
     async listEndpoints(ctx: AuthContext): Promise<WebhookEndpointRecord[]> {
       const rows = await db
         .select()

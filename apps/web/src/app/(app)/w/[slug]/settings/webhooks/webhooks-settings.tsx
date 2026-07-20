@@ -1,6 +1,17 @@
 "use client";
 
-import { Alert, Button, Checkbox, Group, Stack, Text, TextInput, Title } from "@mantine/core";
+import {
+  Accordion,
+  Alert,
+  Button,
+  Checkbox,
+  Group,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
+} from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -15,11 +26,37 @@ interface WebhookRow {
   url: string;
 }
 
+interface DeliveryRow {
+  attempts: number;
+  createdAt: string;
+  endpointId: string;
+  endpointUrl: string;
+  errorSummary: string | null;
+  event: string;
+  id: string;
+  lastResponseCode: number | null;
+  status: string;
+}
+
 async function fetchWebhooks(): Promise<WebhookRow[]> {
   const response = await fetch(`${apiBase}/api/v1/webhooks`, { credentials: "include" });
   const body = (await response.json()) as { data?: WebhookRow[]; error?: { message?: string } };
   if (!response.ok) {
     throw new Error(body.error?.message ?? "Failed to load webhooks.");
+  }
+  return body.data ?? [];
+}
+
+async function fetchDeliveries(): Promise<DeliveryRow[]> {
+  const response = await fetch(`${apiBase}/api/v1/webhooks/deliveries`, {
+    credentials: "include",
+  });
+  const body = (await response.json()) as {
+    data?: DeliveryRow[];
+    error?: { message?: string };
+  };
+  if (!response.ok) {
+    throw new Error(body.error?.message ?? "Failed to load delivery log.");
   }
   return body.data ?? [];
 }
@@ -51,6 +88,11 @@ export function WebhooksSettings({
   const listQuery = useQuery({
     queryFn: fetchWebhooks,
     queryKey: ["webhooks", workspaceSlug],
+  });
+
+  const deliveriesQuery = useQuery({
+    queryFn: fetchDeliveries,
+    queryKey: ["webhook-deliveries", workspaceSlug],
   });
 
   const registerMutation = useMutation({
@@ -104,6 +146,60 @@ export function WebhooksSettings({
           {row.url} ({row.events.join(", ")})
         </Text>
       ))}
+
+      <Title order={3}>Delivery log</Title>
+      {deliveriesQuery.isError ? (
+        <Alert color="red">{(deliveriesQuery.error as Error).message}</Alert>
+      ) : null}
+      {deliveriesQuery.data && deliveriesQuery.data.length === 0 ? (
+        <Text c="dimmed" size="sm">
+          No deliveries yet.
+        </Text>
+      ) : null}
+      {deliveriesQuery.data && deliveriesQuery.data.length > 0 ? (
+        <Table data-testid="webhook-delivery-log" striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Event</Table.Th>
+              <Table.Th>Endpoint</Table.Th>
+              <Table.Th>Status</Table.Th>
+              <Table.Th>Attempts</Table.Th>
+              <Table.Th>Response</Table.Th>
+              <Table.Th>Time</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {deliveriesQuery.data.map((row) => (
+              <Table.Tr key={row.id}>
+                <Table.Td>{row.event}</Table.Td>
+                <Table.Td>
+                  <Text size="sm" truncate maw={240}>
+                    {row.endpointUrl}
+                  </Text>
+                </Table.Td>
+                <Table.Td>{row.status}</Table.Td>
+                <Table.Td>{row.attempts}</Table.Td>
+                <Table.Td>{row.lastResponseCode ?? "—"}</Table.Td>
+                <Table.Td>{new Date(row.createdAt).toLocaleString()}</Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      ) : null}
+      {deliveriesQuery.data?.some((row) => row.errorSummary) ? (
+        <Accordion variant="contained">
+          {deliveriesQuery.data
+            .filter((row) => row.errorSummary)
+            .map((row) => (
+              <Accordion.Item key={row.id} value={row.id}>
+                <Accordion.Control>
+                  Failed: {row.event} → {row.endpointUrl}
+                </Accordion.Control>
+                <Accordion.Panel>{row.errorSummary}</Accordion.Panel>
+              </Accordion.Item>
+            ))}
+        </Accordion>
+      ) : null}
     </Stack>
   );
 }
