@@ -1,6 +1,7 @@
 import { parseEnv } from "@usebugreport/config";
 import type { Worker } from "bullmq";
 import { createIngestFinalizeWorker } from "./jobs/ingest";
+import { createIntegrationsWorker } from "./jobs/integrations";
 import { createRetentionSweepWorker } from "./jobs/retention";
 import { readProcessRssBytes, resolveWorkerConcurrency } from "./ops/concurrency";
 import { logWorkerEvent } from "./ops/logger";
@@ -8,6 +9,7 @@ import { closeWorkersGracefully } from "./ops/shutdown";
 
 export interface WorkerBundle {
   ingestWorker: Worker;
+  integrationsWorker: Worker;
   retentionWorker: Worker;
 }
 
@@ -65,11 +67,13 @@ export function bootWorker(): WorkerBundle {
   );
 
   const ingestWorker = createIngestFinalizeWorker();
+  const integrationsWorker = createIntegrationsWorker();
   const retentionWorker = createRetentionSweepWorker();
   attachWorkerLogging(ingestWorker);
+  attachWorkerLogging(integrationsWorker);
   attachWorkerLogging(retentionWorker);
 
-  for (const worker of [ingestWorker, retentionWorker]) {
+  for (const worker of [ingestWorker, integrationsWorker, retentionWorker]) {
     worker.on("error", (error: Error) => {
       logWorkerEvent({
         err: error,
@@ -78,7 +82,7 @@ export function bootWorker(): WorkerBundle {
     });
   }
 
-  return { ingestWorker, retentionWorker };
+  return { ingestWorker, integrationsWorker, retentionWorker };
 }
 
 let shutdownStarted = false;
@@ -93,7 +97,7 @@ export async function shutdownWorkers(
   shutdownStarted = true;
   logWorkerEvent({ message: "worker shutdown started" });
   await closeWorkersGracefully(
-    [bundle.ingestWorker, bundle.retentionWorker],
+    [bundle.ingestWorker, bundle.integrationsWorker, bundle.retentionWorker],
     drainTimeoutMs
   );
   logWorkerEvent({ message: "worker shutdown complete" });
@@ -104,6 +108,9 @@ if (import.meta.main) {
   const bundle = bootWorker();
   console.log(
     `ingest.finalize worker listening on queue "${bundle.ingestWorker.name}"`
+  );
+  console.log(
+    `integrations.linear_push worker listening on queue "${bundle.integrationsWorker.name}"`
   );
   console.log(
     `retention.sweep worker listening on queue "${bundle.retentionWorker.name}"`

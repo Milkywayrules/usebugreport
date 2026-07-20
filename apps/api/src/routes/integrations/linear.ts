@@ -216,6 +216,43 @@ export function registerLinearIntegrationRoutes(
         return handleServiceError(error, authResult.value.requestId);
       }
     })
+    .post("/api/v1/reports/:reportId/linear/push", async (context) => {
+      const authResult = requireSession(
+        context as unknown as SessionHandlerContext
+      );
+      if (!authResult.ok) {
+        return jsonResponse(authResult.body, authResult.status);
+      }
+
+      const resolved = await resolveAuthContext(db, authResult.value);
+      if ("error" in resolved) {
+        return jsonResponse(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Active workspace required.",
+              requestId: authResult.value.requestId,
+            },
+          },
+          403
+        );
+      }
+
+      try {
+        const data = await integrationService.pushReportToLinear(
+          resolved,
+          context.params.reportId
+        );
+        return {
+          data,
+          requestId: authResult.value.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, authResult.value.requestId);
+      }
+    }, {
+      detail: { tags: [INTEGRATION_PUBLIC_TAG] },
+    })
     .patch("/api/v1/projects/:projectId/linear-default-team", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext
