@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "bun --watch src/index.ts",
-    "test": "echo 'no tests'",
+    "test": "bun test src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check ."
   },
@@ -14,7 +14,9 @@
     "@usebugreport/config": "workspace:*",
     "@usebugreport/queue": "workspace:*",
     "@usebugreport/services": "workspace:*",
-    "bullmq": "^5.40.0"
+    "bullmq": "^5.40.0",
+    "@usebugreport/db": "workspace:*",
+    "@usebugreport/storage": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

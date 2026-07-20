@@ -1,15 +1,14 @@
-import { QUEUE_NAMES } from "@usebugreport/queue";
-import { servicesReady } from "@usebugreport/services";
+import { createIngestFinalizeWorker } from "./jobs/ingest";
 
-/** BullMQ consumer stub — job handlers in E2-S4. */
-export function bootWorkerStub() {
-  return {
-    queues: QUEUE_NAMES,
-    services: servicesReady,
-    status: "stub" as const,
-  };
+export function bootWorker() {
+  const worker = createIngestFinalizeWorker();
+  worker.on("failed", (job, error) => {
+    console.error("ingest worker job failed", job?.id, error.message);
+  });
+  return worker;
 }
 
 if (import.meta.main) {
-  console.log("Worker stub booted:", bootWorkerStub());
+  const worker = bootWorker();
+  console.log(`ingest.finalize worker listening on queue "${worker.name}"`);
 }

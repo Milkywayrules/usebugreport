@@ -70,10 +70,10 @@ development_status:
   1-4-publishable-usebugreport-browser-sdk-package: done
   epic-3: in-progress  # E3 (launch)
   3-1-web-app-shell-theme-and-route-scaffold: done
-  3-3-workspace-switcher-and-pinned-workspaces: review
+  3-3-workspace-switcher-and-pinned-workspaces: done
   2-2-presign-and-complete-ingest-path: done
   2-3-inline-ingest-path-with-ack-latency-measurement: done
-  2-4-ingest-finalize-worker: backlog
+  2-4-ingest-finalize-worker: review
   2-5-reportservice-metadata-reads-and-replay-manifest: backlog
   2-6-usage-quotas-and-ingest-rate-limits: backlog
   2-7-retention-sweep-and-stale-pending-cleanup: backlog

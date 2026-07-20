@@ -9,6 +9,12 @@ mock.module("@aws-sdk/client-s3", () => ({
       this.input = input;
     }
   },
+  HeadObjectCommand: class MockHeadObjectCommand {
+    input: unknown;
+    constructor(input: unknown) {
+      this.input = input;
+    }
+  },
   PutObjectCommand: class MockPutObjectCommand {
     input: unknown;
     constructor(input: unknown) {
@@ -28,7 +34,7 @@ mock.module("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: getSignedUrlMock,
 }));
 
-const { createR2Client, putObject } = await import("../r2");
+const { createR2Client, headObject, putObject } = await import("../r2");
 
 function firstPutCall(): { input: Record<string, unknown> } | undefined {
   const [command] = sendMock.mock.calls[0] ?? [];
@@ -60,6 +66,38 @@ describe("R2 putObject", () => {
     expect(command.input.Key).toBe("org/prj/rpt/meta.json");
     expect(command.input.ContentType).toBe("application/json");
     expect(command.input.Body).toBe(body);
+  });
+
+
+  test("headObject returns content length and type", async () => {
+    sendMock.mockImplementationOnce(() =>
+      Promise.resolve({ ContentLength: 42, ContentType: "application/gzip" })
+    );
+    const client = createR2Client({
+      accessKeyId: "key",
+      accountId: "acct",
+      bucket: "test-bucket",
+      secretAccessKey: "secret",
+    });
+
+    const head = await client.headObject("org/prj/rpt/console.json.gz");
+    expect(head.contentLength).toBe(42);
+    expect(head.contentType).toBe("application/gzip");
+  });
+
+  test("standalone headObject accepts injected client", async () => {
+    sendMock.mockImplementationOnce(() =>
+      Promise.resolve({ ContentLength: 10, ContentType: "application/json" })
+    );
+    const r2 = createR2Client({
+      accessKeyId: "key",
+      accountId: "acct",
+      bucket: "bucket-a",
+      secretAccessKey: "secret",
+    });
+
+    const head = await headObject(r2.client, "bucket-a", "meta.json");
+    expect(head.contentLength).toBe(10);
   });
 
   test("standalone putObject accepts injected client", async () => {

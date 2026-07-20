@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -15,9 +16,16 @@ export interface R2ClientConfig {
 /** Bun-friendly object body for direct R2 uploads (Uint8Array or Node Buffer). */
 export type R2ObjectBody = Uint8Array | Buffer;
 
+export interface R2ObjectHead {
+  contentLength: number;
+  contentType: string | undefined;
+}
+
 export interface R2Client {
   bucket: string;
   client: S3Client;
+  getObject: (key: string) => Promise<Uint8Array>;
+  headObject: (key: string) => Promise<R2ObjectHead>;
   presignGet: (key: string, expiresInSeconds?: number) => Promise<string>;
   presignPut: (
     key: string,
@@ -48,6 +56,8 @@ export function createR2Client(config: R2ClientConfig): R2Client {
   return {
     bucket: config.bucket,
     client,
+    getObject: (key) => getObject(client, config.bucket, key),
+    headObject: (key) => headObject(client, config.bucket, key),
     presignGet: (key, expiresInSeconds = DEFAULT_GET_EXPIRES_SECONDS) =>
       presignGet(client, config.bucket, key, expiresInSeconds),
     presignPut: (
@@ -106,3 +116,37 @@ export function presignGet(
 
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
 }
+
+export async function headObject(
+  client: S3Client,
+  bucket: string,
+  key: string
+): Promise<R2ObjectHead> {
+  const command = new HeadObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+  const result = await client.send(command);
+  return {
+    contentLength: result.ContentLength ?? 0,
+    contentType: result.ContentType,
+  };
+}
+
+export async function getObject(
+  client: S3Client,
+  bucket: string,
+  key: string
+): Promise<Uint8Array> {
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+  const result = await client.send(command);
+  if (!result.Body) {
+    throw new Error("R2 object body missing");
+  }
+  const bytes = await result.Body.transformToByteArray();
+  return new Uint8Array(bytes);
+}
+

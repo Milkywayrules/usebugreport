@@ -66,8 +66,10 @@
       "version": "0.0.0",
       "dependencies": {
         "@usebugreport/config": "workspace:*",
+        "@usebugreport/db": "workspace:*",
         "@usebugreport/queue": "workspace:*",
         "@usebugreport/services": "workspace:*",
+        "@usebugreport/storage": "workspace:*",
         "bullmq": "^5.40.0",
       },
       "devDependencies": {
