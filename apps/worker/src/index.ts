@@ -3,6 +3,7 @@ import type { Worker } from "bullmq";
 import { createIngestFinalizeWorker } from "./jobs/ingest";
 import { createIntegrationsWorker } from "./jobs/integrations";
 import { createRetentionSweepWorker } from "./jobs/retention";
+import { createWebhooksWorker } from "./jobs/webhooks";
 import { readProcessRssBytes, resolveWorkerConcurrency } from "./ops/concurrency";
 import { logWorkerEvent } from "./ops/logger";
 import { closeWorkersGracefully } from "./ops/shutdown";
@@ -11,6 +12,7 @@ export interface WorkerBundle {
   ingestWorker: Worker;
   integrationsWorker: Worker;
   retentionWorker: Worker;
+  webhooksWorker: Worker;
 }
 
 function jobContextFromData(data: unknown): {
@@ -69,11 +71,13 @@ export function bootWorker(): WorkerBundle {
   const ingestWorker = createIngestFinalizeWorker();
   const integrationsWorker = createIntegrationsWorker();
   const retentionWorker = createRetentionSweepWorker();
+  const webhooksWorker = createWebhooksWorker();
   attachWorkerLogging(ingestWorker);
   attachWorkerLogging(integrationsWorker);
   attachWorkerLogging(retentionWorker);
+  attachWorkerLogging(webhooksWorker);
 
-  for (const worker of [ingestWorker, integrationsWorker, retentionWorker]) {
+  for (const worker of [ingestWorker, integrationsWorker, retentionWorker, webhooksWorker]) {
     worker.on("error", (error: Error) => {
       logWorkerEvent({
         err: error,
@@ -82,7 +86,7 @@ export function bootWorker(): WorkerBundle {
     });
   }
 
-  return { ingestWorker, integrationsWorker, retentionWorker };
+  return { ingestWorker, integrationsWorker, retentionWorker, webhooksWorker };
 }
 
 let shutdownStarted = false;
@@ -97,7 +101,7 @@ export async function shutdownWorkers(
   shutdownStarted = true;
   logWorkerEvent({ message: "worker shutdown started" });
   await closeWorkersGracefully(
-    [bundle.ingestWorker, bundle.integrationsWorker, bundle.retentionWorker],
+    [bundle.ingestWorker, bundle.integrationsWorker, bundle.retentionWorker, bundle.webhooksWorker],
     drainTimeoutMs
   );
   logWorkerEvent({ message: "worker shutdown complete" });
@@ -114,6 +118,9 @@ if (import.meta.main) {
   );
   console.log(
     `retention.sweep worker listening on queue "${bundle.retentionWorker.name}"`
+  );
+  console.log(
+    `webhooks worker listening on queue "${bundle.webhooksWorker.name}"`
   );
 
   const onSignal = () => {

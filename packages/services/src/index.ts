@@ -96,7 +96,11 @@ export {
   type WebhookService,
   WEBHOOK_LAUNCH_EVENTS,
   type WebhookLaunchEvent,
+  WEBHOOK_RETRY_DELAYS_MS,
+  type WebhookDispatchInput,
+  type WebhookDeliveryStatus,
 } from "./webhook";
+export { buildWebhookSignature, webhookTimestampSeconds } from "./webhook-sign";
 export {
   createWorkspaceService,
   MAX_PINNED_WORKSPACES,

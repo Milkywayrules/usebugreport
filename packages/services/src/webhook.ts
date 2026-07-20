@@ -1,11 +1,16 @@
 import type { DbClient } from "@usebugreport/db";
-import { webhookEndpoints } from "@usebugreport/db";
-import { eq } from "drizzle-orm";
-import { encryptSecret } from "./crypto/secrets";
+import { reports, webhookDeliveries, webhookEndpoints } from "@usebugreport/db";
+import { and, eq } from "drizzle-orm";
+import { decryptSecret, encryptSecret } from "./crypto/secrets";
 import { generatePrefixedId } from "./project";
 import type { AuthContext } from "./types";
 import { ServiceError } from "./types";
 import type { UsageService } from "./usage";
+import { postWebhookPayload } from "./webhook-delivery-http";
+import {
+  buildWebhookSignature,
+  webhookTimestampSeconds,
+} from "./webhook-sign";
 
 export const WEBHOOK_LAUNCH_EVENTS = [
   "report.created",
@@ -13,6 +18,10 @@ export const WEBHOOK_LAUNCH_EVENTS = [
 ] as const;
 
 export type WebhookLaunchEvent = (typeof WEBHOOK_LAUNCH_EVENTS)[number];
+
+export type WebhookDeliveryStatus = "delivered" | "failed" | "pending";
+
+export const WEBHOOK_RETRY_DELAYS_MS = [0, 60_000, 300_000, 1_800_000, 7_200_000];
 
 export interface RegisterWebhookInput {
   enabled?: boolean;
@@ -32,6 +41,14 @@ export interface WebhookEndpointRecord {
 export interface WebhookServiceDeps {
   encryptionKey: string;
   usageService: UsageService;
+}
+
+export interface WebhookDispatchInput {
+  event: WebhookLaunchEvent;
+  eventId: string;
+  organizationId: string;
+  reportId: string;
+  webhookId: string;
 }
 
 function assertHttpsUrl(url: string): void {
@@ -72,6 +89,26 @@ function mapRow(row: typeof webhookEndpoints.$inferSelect): WebhookEndpointRecor
   };
 }
 
+function serializeReportPayload(report: {
+  createdAt: Date;
+  id: string;
+  organizationId: string;
+  projectId: string;
+  status: string;
+  title: string;
+  updatedAt: Date;
+}) {
+  return {
+    createdAt: report.createdAt.toISOString(),
+    id: report.id,
+    organizationId: report.organizationId,
+    projectId: report.projectId,
+    status: report.status,
+    title: report.title,
+    updatedAt: report.updatedAt.toISOString(),
+  };
+}
+
 export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
   return {
     async listEndpoints(ctx: AuthContext): Promise<WebhookEndpointRecord[]> {
@@ -80,6 +117,24 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
         .from(webhookEndpoints)
         .where(eq(webhookEndpoints.organizationId, ctx.organizationId));
       return rows.map(mapRow);
+    },
+
+    async listActiveEndpointsForEvent(
+      organizationId: string,
+      event: WebhookLaunchEvent
+    ): Promise<Array<{ id: string }>> {
+      const rows = await db
+        .select({ events: webhookEndpoints.events, id: webhookEndpoints.id })
+        .from(webhookEndpoints)
+        .where(
+          and(
+            eq(webhookEndpoints.organizationId, organizationId),
+            eq(webhookEndpoints.enabled, true)
+          )
+        );
+      return rows
+        .filter((row) => (row.events as WebhookLaunchEvent[]).includes(event))
+        .map((row) => ({ id: row.id }));
     },
 
     async register(
@@ -115,6 +170,162 @@ export function createWebhookService(db: DbClient, deps: WebhookServiceDeps) {
       }
 
       return mapRow(row);
+    },
+
+    async processDispatchJob(input: WebhookDispatchInput): Promise<{ deliveryId: string }> {
+      const [endpoint] = await db
+        .select()
+        .from(webhookEndpoints)
+        .where(eq(webhookEndpoints.id, input.webhookId))
+        .limit(1);
+
+      if (!endpoint || endpoint.organizationId !== input.organizationId) {
+        throw new ServiceError("NOT_FOUND", "Webhook endpoint not found.");
+      }
+
+      if (!endpoint.enabled) {
+        throw new ServiceError("VALIDATION_ERROR", "Webhook endpoint is disabled.");
+      }
+
+      const events = endpoint.events as WebhookLaunchEvent[];
+      if (!events.includes(input.event)) {
+        throw new ServiceError("VALIDATION_ERROR", "Webhook endpoint does not subscribe to event.");
+      }
+
+      const [report] = await db
+        .select({
+          createdAt: reports.createdAt,
+          id: reports.id,
+          organizationId: reports.organizationId,
+          projectId: reports.projectId,
+          status: reports.status,
+          title: reports.title,
+          updatedAt: reports.updatedAt,
+        })
+        .from(reports)
+        .where(
+          and(
+            eq(reports.id, input.reportId),
+            eq(reports.organizationId, input.organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!report) {
+        throw new ServiceError("NOT_FOUND", "Report not found for webhook dispatch.");
+      }
+
+      const payload = {
+        data: { report: serializeReportPayload(report) },
+        id: input.eventId,
+        type: input.event,
+      };
+
+      const deliveryId = generatePrefixedId("whd");
+      const now = new Date();
+      await db.insert(webhookDeliveries).values({
+        attempts: 0,
+        createdAt: now,
+        endpointId: endpoint.id,
+        event: input.event,
+        id: deliveryId,
+        nextAttemptAt: now,
+        payload,
+        status: "pending",
+      });
+
+      return { deliveryId };
+    },
+
+    async processDeliverJob(deliveryId: string): Promise<{ retryDelayMs?: number }> {
+      const [delivery] = await db
+        .select()
+        .from(webhookDeliveries)
+        .where(eq(webhookDeliveries.id, deliveryId))
+        .limit(1);
+
+      if (!delivery) {
+        throw new ServiceError("NOT_FOUND", "Webhook delivery not found.");
+      }
+
+      if (delivery.status === "delivered") {
+        return {};
+      }
+
+      if (delivery.status === "failed") {
+        return {};
+      }
+
+      const [endpoint] = await db
+        .select()
+        .from(webhookEndpoints)
+        .where(eq(webhookEndpoints.id, delivery.endpointId))
+        .limit(1);
+
+      if (!endpoint) {
+        await db
+          .update(webhookDeliveries)
+          .set({ status: "failed" })
+          .where(eq(webhookDeliveries.id, deliveryId));
+        return {};
+      }
+
+      const attemptNumber = delivery.attempts + 1;
+      const rawBody = JSON.stringify(delivery.payload);
+      const timestamp = webhookTimestampSeconds();
+      const secret = await decryptSecret(endpoint.secretEncrypted, deps.encryptionKey);
+      const signature = buildWebhookSignature(secret, timestamp, rawBody);
+
+      const result = await postWebhookPayload(endpoint.url, {
+        "X-UseBugReport-Signature": signature,
+        "X-UseBugReport-Timestamp": timestamp,
+      }, rawBody);
+
+      const success =
+        result.responseCode !== null &&
+        result.responseCode >= 200 &&
+        result.responseCode < 300;
+
+      if (success) {
+        await db
+          .update(webhookDeliveries)
+          .set({
+            attempts: attemptNumber,
+            lastResponseCode: result.responseCode,
+            nextAttemptAt: null,
+            status: "delivered",
+          })
+          .where(eq(webhookDeliveries.id, deliveryId));
+        return {};
+      }
+
+      const maxAttempts = WEBHOOK_RETRY_DELAYS_MS.length;
+      if (attemptNumber >= maxAttempts) {
+        await db
+          .update(webhookDeliveries)
+          .set({
+            attempts: attemptNumber,
+            lastResponseCode: result.responseCode,
+            nextAttemptAt: null,
+            status: "failed",
+          })
+          .where(eq(webhookDeliveries.id, deliveryId));
+        return {};
+      }
+
+      const delayMs = WEBHOOK_RETRY_DELAYS_MS[attemptNumber] ?? 0;
+      const nextAttemptAt = new Date(Date.now() + delayMs);
+      await db
+        .update(webhookDeliveries)
+        .set({
+          attempts: attemptNumber,
+          lastResponseCode: result.responseCode,
+          nextAttemptAt,
+          status: "pending",
+        })
+        .where(eq(webhookDeliveries.id, deliveryId));
+
+      return { retryDelayMs: delayMs };
     },
   };
 }

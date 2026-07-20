@@ -12,22 +12,21 @@ import {
 import {
   createCaptureIngestService,
   createUsageService,
+  createWebhookService,
 } from "@usebugreport/services";
 import { createR2Client } from "@usebugreport/storage";
 import { type Job, Worker } from "bullmq";
 import { resolveWorkerConcurrency } from "../ops/concurrency";
 
-async function listRegisteredWebhooks(
-  _organizationId: string
-): Promise<Array<{ id: string }>> {
-  // Webhook registration lands in E8 — no endpoints registered yet.
-  return [];
-}
 
 export function createIngestFinalizeWorker(): Worker {
   const env = parseEnv(process.env);
   const db = createDbClient(env.DATABASE_URL);
   const usageService = createUsageService(db);
+  const webhookService = createWebhookService(db, {
+    encryptionKey: env.ENCRYPTION_KEY,
+    usageService,
+  });
   const r2 = createR2Client({
     accessKeyId: env.R2_ACCESS_KEY_ID,
     accountId: env.R2_ACCOUNT_ID,
@@ -41,16 +40,22 @@ export function createIngestFinalizeWorker(): Worker {
       throw new Error("enqueueFinalize is API-only");
     },
     enqueueWebhookDispatch: async ({ organizationId, reportId }) => {
-      const hooks = await listRegisteredWebhooks(organizationId);
+      const hooks = await webhookService.listActiveEndpointsForEvent(
+        organizationId,
+        "report.created"
+      );
       for (const hook of hooks) {
         await webhooksQueue.add(JOB_NAMES.WEBHOOKS_DISPATCH, {
-          eventId: `evt_${reportId}`,
+          event: "report.created",
+          eventId: `evt_created_${reportId}`,
+          organizationId,
           reportId,
           webhookId: hook.id,
         });
       }
     },
-    listRegisteredWebhooks,
+    listRegisteredWebhooks: (organizationId) =>
+      webhookService.listActiveEndpointsForEvent(organizationId, "report.created"),
     r2,
     usageService,
   });

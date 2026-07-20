@@ -40,7 +40,9 @@ import {
   workspaceApiKeys,
   workspaceApiKeysRelations,
   workspaceUsageMonthly,
+  webhookDeliveries,
   webhookEndpoints,
+  webhookDeliveriesRelations,
   webhookEndpointsRelations,
   workspaceUsageMonthlyRelations,
 } from "./schema/index";
@@ -84,6 +86,8 @@ export const schema = {
   verification,
   workspaceApiKeys,
   workspaceApiKeysRelations,
+  webhookDeliveries,
+  webhookDeliveriesRelations,
   webhookEndpoints,
   webhookEndpointsRelations,
   workspaceUsageMonthly,

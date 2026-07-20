@@ -4,6 +4,7 @@ import {
   getActiveFinalizeCount,
   ingestFinalizePayloadSchema,
   integrationsLinearPushPayloadSchema,
+  webhooksDispatchPayloadSchema,
   JOB_NAMES,
   QUEUE_NAMES,
 } from "@usebugreport/queue";
@@ -95,6 +96,10 @@ const ingestQueue = createQueue(
 const integrationsQueue = createQueue(
   QUEUE_NAMES.INTEGRATIONS,
   integrationsLinearPushPayloadSchema
+);
+const webhooksQueue = createQueue(
+  QUEUE_NAMES.WEBHOOKS,
+  webhooksDispatchPayloadSchema
 );
 const webhookService = createWebhookService(db, {
   encryptionKey: env.ENCRYPTION_KEY,
@@ -322,7 +327,25 @@ const appWithRoutes = registerLinearIntegrationRoutes(
         )
       )
     ),
-      { reportService, searchService }
+      {
+        enqueueReportUpdatedWebhooks: async ({ organizationId, reportId }) => {
+          const hooks = await webhookService.listActiveEndpointsForEvent(
+            organizationId,
+            "report.updated"
+          );
+          for (const hook of hooks) {
+            await webhooksQueue.add(JOB_NAMES.WEBHOOKS_DISPATCH, {
+              event: "report.updated",
+              eventId: `evt_updated_${reportId}_${Date.now()}`,
+              organizationId,
+              reportId,
+              webhookId: hook.id,
+            });
+          }
+        },
+        reportService,
+        searchService,
+      }
     ),
     {
       captureIngestService,

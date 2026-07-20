@@ -18,6 +18,10 @@ import { requireSession } from "../middleware/session";
 type SessionHandlerContext = Parameters<typeof requireSession>[0];
 
 export interface ReportRouteDeps {
+  enqueueReportUpdatedWebhooks?: (input: {
+    organizationId: string;
+    reportId: string;
+  }) => Promise<void>;
   reportService: ReportService;
   searchService: SearchService;
 }
@@ -69,7 +73,7 @@ export function registerReportRoutes(
   deps: ReportRouteDeps
 ): unknown {
   const routeApp = app as Elysia;
-  const { reportService, searchService } = deps;
+  const { enqueueReportUpdatedWebhooks, reportService, searchService } = deps;
 
   return routeApp
     .get(
@@ -308,6 +312,13 @@ export function registerReportRoutes(
             | "open"
             | "resolved"
         );
+
+        if (enqueueReportUpdatedWebhooks) {
+          await enqueueReportUpdatedWebhooks({
+            organizationId: report.organizationId,
+            reportId: report.id,
+          });
+        }
 
         return {
           data: {
