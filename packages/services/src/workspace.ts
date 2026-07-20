@@ -3,6 +3,7 @@ import {
   member,
   organization,
   session,
+  user,
   userPreferences,
 } from "@usebugreport/db";
 import { and, eq, sql } from "drizzle-orm";
@@ -169,6 +170,26 @@ export function createWorkspaceService(
         pinnedOrder: (row?.pinnedOrder as Record<string, number> | null) ?? {},
         pinnedWorkspaceIds: row?.pinnedWorkspaceIds ?? [],
       };
+    },
+
+    async listMembers(ctx: AuthContext, organizationId: string) {
+      if (ctx.organizationId !== organizationId) {
+        throw new ServiceError("NOT_FOUND", "Workspace not found.");
+      }
+
+      await requireOrgAdmin(db, requireSessionUserId(ctx), organizationId);
+
+      return db
+        .select({
+          email: user.email,
+          name: user.name,
+          role: member.role,
+          userId: member.userId,
+        })
+        .from(member)
+        .innerJoin(user, eq(member.userId, user.id))
+        .where(eq(member.organizationId, organizationId))
+        .orderBy(user.name);
     },
 
     async listWorkspacesForUser(ctx: AuthContext) {
