@@ -38,6 +38,8 @@ if (process.env.RESEND_API_KEY?.trim()) {
 
 export default defineConfig({
   testDir: "./e2e",
+  // Shared Postgres fixtures truncate auth tables; parallel workers race (E4-S3 e2e).
+  workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL: webBaseUrl,
   },

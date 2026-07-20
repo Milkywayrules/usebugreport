@@ -18,3 +18,4 @@ dist/
 
 # agent harness secrets
 .github-agent.local
+test-results/

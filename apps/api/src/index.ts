@@ -1,32 +1,56 @@
 import { cors } from "@elysiajs/cors";
-import { createUsageService, servicesReady } from "@usebugreport/services";
+import {
+  createProjectService,
+  createUsageService,
+  createWorkspaceService,
+  ServiceError,
+  servicesReady,
+} from "@usebugreport/services";
 import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { auth, db, initAuth } from "./lib/auth";
 import { getEnv } from "./lib/env";
+import { serviceErrorToHttp } from "./lib/errors";
+import { readJsonBody } from "./lib/request-body";
 import { onboardingGateMiddleware } from "./middleware/onboarding-gate";
 import { requireSession, sessionMiddleware } from "./middleware/session";
-
-function slugifyWorkspaceName(name: string): string {
-  return (
-    name
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 48) || "workspace"
-  );
-}
+import { registerProjectRoutes } from "./routes/projects";
+import { registerUserPreferenceRoutes } from "./routes/user-preferences";
+import { registerWorkspaceRoutes } from "./routes/workspaces";
 
 initAuth();
 const env = getEnv();
 
-export const app = new Elysia()
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { "Content-Type": "application/json" },
+    status,
+  });
+}
+
+function handleServiceError(error: unknown, requestId: string): Response {
+  if (error instanceof ServiceError) {
+    const mapped = serviceErrorToHttp(error, requestId);
+    return jsonResponse(mapped.body, mapped.status);
+  }
+  throw error;
+}
+
+const usageService = createUsageService(db);
+const workspaceService = createWorkspaceService(db, {
+  authApi: {
+    getSession: auth.api.getSession,
+  },
+  usageService,
+});
+const projectService = createProjectService(db);
+
+const baseApp = new Elysia()
   .use(
     cors({
       allowedHeaders: ["Content-Type", "Authorization"],
       credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       origin: env.APP_URL,
     })
   )
@@ -53,10 +77,7 @@ export const app = new Elysia()
   .get("/api/v1/session", async (context) => {
     const authResult = requireSession(context);
     if (!authResult.ok) {
-      return new Response(JSON.stringify(authResult.body), {
-        headers: { "Content-Type": "application/json" },
-        status: authResult.status,
-      });
+      return jsonResponse(authResult.body, authResult.status);
     }
 
     const organizations = await (
@@ -76,103 +97,94 @@ export const app = new Elysia()
       user: authResult.value.user,
     };
   })
-  .get("/api/v1/protected-probe", (context) => {
-    const authResult = requireSession(context);
-    if (!authResult.ok) {
-      return new Response(JSON.stringify(authResult.body), {
-        headers: { "Content-Type": "application/json" },
-        status: authResult.status,
-      });
-    }
-
-    return { ok: true };
-  })
   .post("/api/v1/onboarding/workspace", async (context) => {
     const authResult = requireSession(context);
     if (!authResult.ok) {
-      return new Response(JSON.stringify(authResult.body), {
-        headers: { "Content-Type": "application/json" },
-        status: authResult.status,
-      });
+      return jsonResponse(authResult.body, authResult.status);
     }
 
-    let body: { name?: string };
-    try {
-      body = (await context.request.json()) as { name?: string };
-    } catch {
-      return new Response(
-        JSON.stringify({
-          error: { message: "Invalid request body." },
-        }),
+    const body = readJsonBody<{
+      name?: string;
+      projectName?: string;
+      slug?: string;
+    }>(context.body);
+    if (!body) {
+      return jsonResponse(
         {
-          headers: { "Content-Type": "application/json" },
-          status: 422,
-        }
-      );
-    }
-
-    const trimmedName = body.name?.trim();
-    if (!trimmedName) {
-      return new Response(
-        JSON.stringify({
-          error: { message: "Workspace name is required." },
-        }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 422,
-        }
-      );
-    }
-
-    const usageService = createUsageService(db);
-    const tierCheck = await usageService.checkTierLimit(
-      { organizationId: "", userId: authResult.value.user.id },
-      "workspaces"
-    );
-
-    if (!tierCheck.allowed) {
-      return new Response(
-        JSON.stringify({
           error: {
-            code: tierCheck.code,
-            message: tierCheck.message,
+            code: "VALIDATION_ERROR",
+            message: "Invalid request body.",
+            requestId: authResult.value.requestId,
           },
-        }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 403,
-        }
+        },
+        422
       );
     }
 
-    const slug = slugifyWorkspaceName(trimmedName);
+    try {
+      const ctx = {
+        organizationId: "",
+        requestId: authResult.value.requestId,
+        type: "session" as const,
+        userId: authResult.value.user.id,
+      };
 
-    const organization = await (
-      auth.api as unknown as {
-        createOrganization: (input: {
-          body: { name: string; slug: string };
-          headers: Headers;
-        }) => Promise<{ id: string; slug: string }>;
+      const organization = await workspaceService.createWorkspace(
+        ctx,
+        { name: body.name ?? "", slug: body.slug },
+        context.request.headers
+      );
+
+      let project:
+        | Awaited<ReturnType<typeof projectService.createProject>>["project"]
+        | undefined;
+      let ingestKeyPlaintext: string | undefined;
+
+      const projectName = body.projectName?.trim();
+      if (projectName) {
+        const created = await projectService.createProject(
+          {
+            ...ctx,
+            organizationId: organization.id,
+          },
+          { name: projectName }
+        );
+        ({ ingestKeyPlaintext, project } = created);
       }
-    ).createOrganization({
-      body: { name: trimmedName, slug },
-      headers: context.request.headers,
-    });
 
-    await (
-      auth.api as unknown as {
-        setActiveOrganization: (input: {
-          body: { organizationId: string };
-          headers: Headers;
-        }) => Promise<unknown>;
-      }
-    ).setActiveOrganization({
-      body: { organizationId: organization.id },
-      headers: context.request.headers,
-    });
-
-    return { organization: { slug: organization.slug } };
+      return {
+        ingestKeyPlaintext,
+        organization: { id: organization.id, slug: organization.slug },
+        project,
+        requestId: authResult.value.requestId,
+      };
+    } catch (error) {
+      return handleServiceError(error, authResult.value.requestId);
+    }
   });
+
+const appWithRoutes = registerUserPreferenceRoutes(
+  registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+) as typeof baseApp;
+
+let app = appWithRoutes as typeof baseApp;
+
+app = app.get("/api/v1/protected-probe", (context) => {
+  if (process.env.NODE_ENV === "production") {
+    return new Response(null, { status: 404 });
+  }
+
+  const authResult = requireSession(
+    context as unknown as Parameters<typeof requireSession>[0]
+  );
+  if (!authResult.ok) {
+    return jsonResponse(authResult.body, authResult.status);
+  }
+
+  return { ok: true };
+}) as unknown as typeof baseApp;
+
+export { app };
 
 if (import.meta.main) {
   const port = Number(process.env.PORT ?? 3001);

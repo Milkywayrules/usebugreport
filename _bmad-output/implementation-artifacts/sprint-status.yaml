@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: 2026-07-20 08:05
+# last_updated: 2026-07-20 10:45
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 08:05"
+last_updated: "2026-07-20 10:45"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
   2-1-core-ingest-schema-and-queue-payloads: done
   4-6-usageservice-tier-limits-at-service-boundary-ad-11: done  # UsageService before workspace CRUD (E4-S3)
   4-2-onboarding-gate-middleware: done
-  4-3-workspace-and-project-crud-with-ingest-keys: backlog
+  4-3-workspace-and-project-crud-with-ingest-keys: done
   4-4-project-level-rbac: backlog
   4-5-workspace-api-key-management: backlog
   epic-4-retrospective: optional

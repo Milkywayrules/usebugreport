@@ -1,7 +1,12 @@
 import { Code, Container, Stack, Text, Title } from "@mantine/core";
+import { redirect } from "next/navigation";
 import { getServerSession } from "../../../../lib/auth-server";
 
 export default async function DevSessionPage() {
+  if (process.env.NODE_ENV === "production") {
+    redirect("/login");
+  }
+
   const { organizations, session, user } = await getServerSession();
 
   return (
@@ -9,8 +14,7 @@ export default async function DevSessionPage() {
       <Stack gap="md">
         <Title order={3}>Dev session probe</Title>
         <Text c="dimmed" size="sm">
-          E4-S2 handoff: organization membership count exposed from session
-          helper.
+          Organization membership count exposed from session helper.
         </Text>
         <Code block>
           {JSON.stringify(

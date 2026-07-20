@@ -4,8 +4,10 @@ import { getEnv } from "../lib/env";
 import type { SessionContext } from "./session";
 
 const EXEMPT_PATHS = new Set([
-  "/api/v1/session",
   "/api/v1/onboarding/workspace",
+  "/api/v1/session",
+  "/api/v1/user/preferences",
+  "/api/v1/workspaces",
 ]);
 
 export function isApiOnboardingGateExempt(pathname: string): boolean {

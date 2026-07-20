@@ -3,6 +3,7 @@ export const ONBOARDING_ALLOWLIST = [
   "/login",
   "/auth/callback",
   "/onboarding",
+  "/settings/workspaces",
 ] as const;
 
 const PUBLIC_UNAUTHENTICATED_PATHS = ["/login", "/auth/callback"] as const;

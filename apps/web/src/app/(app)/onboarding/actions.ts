@@ -4,8 +4,12 @@ import { headers } from "next/headers";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-export async function createWorkspaceAction(name: string): Promise<{
+export async function createWorkspaceAction(
+  name: string,
+  projectName?: string
+): Promise<{
   error?: string;
+  ingestKeyPlaintext?: string;
   slug?: string;
 }> {
   const trimmed = name.trim();
@@ -17,7 +21,10 @@ export async function createWorkspaceAction(name: string): Promise<{
   const cookie = requestHeaders.get("cookie") ?? "";
 
   const response = await fetch(`${apiUrl}/api/v1/onboarding/workspace`, {
-    body: JSON.stringify({ name: trimmed }),
+    body: JSON.stringify({
+      name: trimmed,
+      projectName: projectName?.trim() || undefined,
+    }),
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -36,8 +43,12 @@ export async function createWorkspaceAction(name: string): Promise<{
   }
 
   const body = (await response.json()) as {
+    ingestKeyPlaintext?: string;
     organization: { slug: string };
   };
 
-  return { slug: body.organization.slug };
+  return {
+    ingestKeyPlaintext: body.ingestKeyPlaintext,
+    slug: body.organization.slug,
+  };
 }
