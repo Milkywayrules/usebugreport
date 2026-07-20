@@ -29,11 +29,13 @@ interface WorkspaceRow {
 }
 
 interface WorkspacesSettingsProps {
+  deletionByOrgId: Record<string, { lastCompletedStep: string | null; status: string }>;
   initialPinnedIds: string[];
   workspaces: WorkspaceRow[];
 }
 
 export function WorkspacesSettings({
+  deletionByOrgId,
   initialPinnedIds,
   workspaces,
 }: WorkspacesSettingsProps) {
@@ -109,6 +111,16 @@ export function WorkspacesSettings({
           Create workspace
         </Button>
       </Group>
+
+      {workspaces.some((workspace) => deletionByOrgId[workspace.id]) ? (
+        <Alert
+          color="orange"
+          data-testid="deletion-in-progress-banner"
+          title="Deletion in progress"
+        >
+          One or more workspaces are being deleted. Access remains read-only until purge completes.
+        </Alert>
+      ) : null}
 
       {error ? (
         <Alert color="red" data-testid="workspace-error" title="Error">
