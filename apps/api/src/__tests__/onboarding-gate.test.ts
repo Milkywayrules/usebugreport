@@ -13,9 +13,6 @@ import {
 } from "../middleware/onboarding-gate";
 import { applyTestEnv, hasDatabaseUrl } from "./test-env";
 
-const databaseUrl = process.env.DATABASE_URL;
-const runIntegration = hasDatabaseUrl() ? describe : describe.skip;
-
 describe("onboarding gate predicates", () => {
   test("session probe is exempt from API gate", () => {
     expect(isApiOnboardingGateExempt("/api/v1/session")).toBe(true);
@@ -55,7 +52,7 @@ describe("onboarding gate predicates", () => {
   });
 });
 
-runIntegration("onboarding gate integration", () => {
+describe.skipIf(!hasDatabaseUrl())("onboarding gate integration", () => {
   let app: typeof import("../index").app;
   let auth: typeof import("../lib/auth").auth;
   let db: typeof import("../lib/auth").db;
@@ -65,7 +62,7 @@ runIntegration("onboarding gate integration", () => {
   let memberTable: typeof import("@usebugreport/db").schema.member;
 
   beforeAll(async () => {
-    if (!databaseUrl) {
+    if (!hasDatabaseUrl()) {
       return;
     }
 
