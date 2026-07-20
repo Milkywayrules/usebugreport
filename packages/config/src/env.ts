@@ -12,6 +12,7 @@ export const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().min(1),
   LINEAR_CLIENT_ID: z.string().min(1),
   LINEAR_CLIENT_SECRET: z.string().min(1),
+  LINEAR_WEBHOOK_SECRET: z.string().min(1).optional(),
   R2_ACCESS_KEY_ID: z.string().min(1),
   R2_ACCOUNT_ID: z.string().min(1),
   R2_BUCKET: z.string().min(1),

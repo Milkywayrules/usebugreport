@@ -1,4 +1,5 @@
 import type { IntegrationsLinearPushPayload } from "@usebugreport/queue";
+import { createLinearInboundHandlers } from "./integration-linear-inbound";
 import { createLinearPushHandlers } from "./integration-linear-push";
 
 import { createHmac } from "node:crypto";
@@ -32,6 +33,7 @@ export interface IntegrationServiceDeps {
 
 interface LinearIntegrationConfig {
   defaultTeamId?: string | null;
+  statusMapping?: Record<string, string>;
 }
 
 function signStateBody(body: string, secret: string): string {
@@ -173,6 +175,7 @@ export function createIntegrationService(
     return tokens.access_token;
   }
 
+  const linearInbound = createLinearInboundHandlers(db);
   const linearPush = createLinearPushHandlers(db, deps, {
     ensureFreshAccessToken,
     rbac,
@@ -305,6 +308,7 @@ export function createIntegrationService(
       return body.data?.teams?.nodes ?? [];
     },
 
+    handleLinearInboundWebhook: linearInbound.handleWebhook,
     processLinearPushJob: linearPush.processLinearPushJob,
     pushReportToLinear: linearPush.pushReportToLinear,
 

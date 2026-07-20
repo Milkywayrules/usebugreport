@@ -17,6 +17,7 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@linear/sdk": "^88.2.0",
     "@usebugreport/config": "workspace:*",
     "@usebugreport/contracts": "workspace:*",
     "@usebugreport/db": "workspace:*",

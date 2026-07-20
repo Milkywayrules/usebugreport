@@ -39,6 +39,47 @@ export function registerLinearIntegrationRoutes(
   const env = getEnv();
 
   return routeApp
+    .post("/api/v1/integrations/linear/webhook", async (context) => {
+      const requestId =
+        "requestId" in context && typeof context.requestId === "string"
+          ? context.requestId
+          : crypto.randomUUID();
+
+      const secret = env.LINEAR_WEBHOOK_SECRET;
+      if (!secret) {
+        return jsonResponse(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Linear webhook secret is not configured.",
+              requestId,
+            },
+          },
+          503
+        );
+      }
+
+      const rawBody = await context.request.text();
+      const signature = context.request.headers.get("linear-signature");
+      const timestamp = context.request.headers.get("linear-timestamp");
+
+      try {
+        const result = await integrationService.handleLinearInboundWebhook({
+          rawBody,
+          signature,
+          timestamp,
+          webhookSecret: secret,
+        });
+        return {
+          data: result,
+          requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, requestId);
+      }
+    }, {
+      detail: { tags: [INTEGRATION_PUBLIC_TAG] },
+    })
     .get("/api/v1/integrations/linear/authorize", async (context) => {
       const authResult = requireSession(
         context as unknown as SessionHandlerContext
