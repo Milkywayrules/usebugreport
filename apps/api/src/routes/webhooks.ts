@@ -78,6 +78,25 @@ export function registerWebhookRoutes(app: unknown, deps: WebhookRouteDeps): unk
   const { webhookService } = deps;
 
   return routeApp
+    .get("/api/v1/webhooks/deliveries", async (context) => {
+      const access = await resolveManageContext(context);
+      if (!access.ok) {
+        return jsonResponse(access.body, access.status);
+      }
+
+      try {
+        const data = await webhookService.listDeliveries(access.ctx);
+        return {
+          data: data.map((row) => ({
+            ...row,
+            createdAt: row.createdAt.toISOString(),
+          })),
+          requestId: access.requestId,
+        };
+      } catch (error) {
+        return handleServiceError(error, access.requestId);
+      }
+    }, { detail: { tags: [INTEGRATION_PUBLIC_TAG] } })
     .get("/api/v1/webhooks", async (context) => {
       const access = await resolveManageContext(context);
       if (!access.ok) {

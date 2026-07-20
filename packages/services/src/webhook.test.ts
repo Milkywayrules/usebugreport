@@ -19,3 +19,27 @@ describe("webhook HMAC signing", () => {
     expect(a.startsWith("sha256=")).toBe(true);
   });
 });
+
+import { formatWebhookDeliveryError } from "./webhook";
+
+describe("formatWebhookDeliveryError", () => {
+  test("returns null for delivered rows", () => {
+    expect(
+      formatWebhookDeliveryError({
+        attempts: 1,
+        lastResponseCode: 200,
+        status: "delivered",
+      })
+    ).toBeNull();
+  });
+
+  test("summarizes failed HTTP responses without secrets", () => {
+    expect(
+      formatWebhookDeliveryError({
+        attempts: 3,
+        lastResponseCode: 502,
+        status: "failed",
+      })
+    ).toBe("HTTP 502 after 3 attempt(s).");
+  });
+});
