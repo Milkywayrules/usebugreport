@@ -301,8 +301,10 @@ const baseApp = new Elysia()
   );
 
 const appWithMcp = registerMcpRoutes(baseApp, {
+  reportService,
   resolveAuth: (authorization, requestId) =>
     resolveApiKeyFromRequest(db, authorization, requestId),
+  searchService,
 }) as typeof baseApp;
 
 const appWithRoutes = registerLinearIntegrationRoutes(
