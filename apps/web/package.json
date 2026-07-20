@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "test": "echo 'no tests'",
+    "test": "bun test src/lib/report-detail",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "lint": "biome check ."
   },
@@ -16,12 +16,14 @@
     "@mantine/notifications": "7.17.8",
     "@mantine/spotlight": "7.17.8",
     "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-table": "^8.21.3",
     "@usebugreport/config": "workspace:*",
     "better-auth": "^1.2.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@tanstack/react-table": "^8.21.3"
+    "rrweb": "^2.1.0",
+    "rrweb-player": "^1.0.0-alpha.4"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
