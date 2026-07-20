@@ -1,6 +1,8 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -21,6 +23,11 @@ export interface R2ObjectHead {
   contentType: string | undefined;
 }
 
+export interface R2ListedObject {
+  key: string;
+  lastModified: Date | undefined;
+}
+
 export interface R2Client {
   bucket: string;
   client: S3Client;
@@ -37,6 +44,8 @@ export interface R2Client {
     body: R2ObjectBody,
     contentType: string
   ) => Promise<void>;
+  deleteObject: (key: string) => Promise<void>;
+  listObjects: (prefix: string) => Promise<R2ListedObject[]>;
 }
 
 const DEFAULT_PUT_EXPIRES_SECONDS = 900;
@@ -67,6 +76,8 @@ export function createR2Client(config: R2ClientConfig): R2Client {
     ) => presignPut(client, config.bucket, key, contentType, expiresInSeconds),
     putObject: (key, body, contentType) =>
       putObject(client, config.bucket, key, body, contentType),
+    deleteObject: (key) => deleteObject(client, config.bucket, key),
+    listObjects: (prefix) => listObjects(client, config.bucket, prefix),
   };
 }
 
@@ -148,4 +159,49 @@ export async function getObject(
   }
   const bytes = await result.Body.transformToByteArray();
   return new Uint8Array(bytes);
+}
+
+
+export function deleteObject(
+  client: S3Client,
+  bucket: string,
+  key: string
+): Promise<void> {
+  const command = new DeleteObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+
+  return client.send(command).then(() => undefined);
+}
+
+export async function listObjects(
+  client: S3Client,
+  bucket: string,
+  prefix: string
+): Promise<R2ListedObject[]> {
+  const objects: R2ListedObject[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const command = new ListObjectsV2Command({
+      Bucket: bucket,
+      ContinuationToken: continuationToken,
+      Prefix: prefix,
+    });
+    const result = await client.send(command);
+    for (const item of result.Contents ?? []) {
+      if (item.Key) {
+        objects.push({
+          key: item.Key,
+          lastModified: item.LastModified,
+        });
+      }
+    }
+    continuationToken = result.IsTruncated
+      ? result.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+
+  return objects;
 }
