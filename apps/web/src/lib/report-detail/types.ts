@@ -34,6 +34,7 @@ export interface ReportDetailRecord {
 
 export interface ReportCommentRecord {
   authorDisplayName: string;
+  authorType: "api_key" | "user";
   body: string;
   createdAt: string;
   id: string;

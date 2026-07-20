@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Stack, Text, Textarea } from "@mantine/core";
+import { Badge, Button, Stack, Text, Textarea } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -31,6 +31,7 @@ export function CommentsPanel({ reportId }: { reportId: string }) {
       const previous = queryClient.getQueryData(["report", reportId, "comments"]);
       const optimistic = {
         authorDisplayName: "You",
+        authorType: "user" as const,
         body,
         createdAt: new Date().toISOString(),
         id: `optimistic-${Date.now()}`,
@@ -83,6 +84,11 @@ export function CommentsPanel({ reportId }: { reportId: string }) {
             <Stack gap={2} key={comment.id}>
               <Text fw={600} size="sm">
                 {comment.authorDisplayName}
+                {comment.authorType === "api_key" ? (
+                  <Badge color="grape" ml="xs" size="xs" variant="light">
+                    Agent
+                  </Badge>
+                ) : null}
                 <Text c="dimmed" component="span" ml="xs" size="xs">
                   {new Date(comment.createdAt).toLocaleString()}
                 </Text>
