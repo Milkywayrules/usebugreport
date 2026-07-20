@@ -5,8 +5,8 @@ import type { IngestFinalizePayload } from "@usebugreport/queue";
 import type { R2Client, R2ObjectHead } from "@usebugreport/storage";
 import { and, eq } from "drizzle-orm";
 import { generatePrefixedId } from "./project";
-import type { UsageService } from "./usage";
 import { ServiceError } from "./types";
+import type { UsageService } from "./usage";
 
 export type IngestPartName =
   | "replay"
@@ -14,6 +14,8 @@ export type IngestPartName =
   | "network"
   | "screenshot"
   | "meta";
+
+const REPLAY_BATCH_KEY_REGEX = /^replay\/batch-(\d+)\.json\.gz$/;
 
 const INGEST_PART_NAMES: IngestPartName[] = [
   "replay",
@@ -81,16 +83,14 @@ export interface CaptureIngestServiceDeps {
   usageService: Pick<UsageService, "getRetentionDays" | "increment">;
 }
 
-
-
-type ReportRow = {
+interface ReportRow {
   description: string | null;
   id: string;
   ingestStatus: "complete" | "failed" | "pending" | "processing";
   organizationId: string;
   projectId: string;
   title: string;
-};
+}
 
 function blobIdFactory(deps: CaptureIngestServiceDeps): () => string {
   return deps.generateBlobId ?? (() => generatePrefixedId("blb"));
@@ -126,7 +126,7 @@ function classifyIngestR2Key(
     return { contentType: "application/json", seq: 0, type: "meta" };
   }
 
-  const replayMatch = /^replay\/batch-(\d+)\.json\.gz$/.exec(suffix);
+  const replayMatch = REPLAY_BATCH_KEY_REGEX.exec(suffix);
   if (replayMatch) {
     return {
       contentType: "application/gzip",
@@ -184,18 +184,43 @@ async function headValidateKeys(
   r2: Pick<R2Client, "headObject">,
   keys: string[]
 ): Promise<Map<string, R2ObjectHead>> {
-  const heads = new Map<string, R2ObjectHead>();
-  for (const key of keys) {
-    try {
-      heads.set(key, await r2.headObject(key));
-    } catch {
-      throw new ServiceError(
-        "VALIDATION_ERROR",
-        "One or more uploaded objects are missing in storage."
-      );
-    }
+  const entries = await Promise.all(
+    keys.map(async (key) => {
+      try {
+        return [key, await r2.headObject(key)] as const;
+      } catch (error) {
+        const wrapped = new ServiceError(
+          "VALIDATION_ERROR",
+          "One or more uploaded objects are missing in storage."
+        );
+        wrapped.cause = error;
+        throw wrapped;
+      }
+    })
+  );
+  return new Map(entries);
+}
+
+function validateFinalizePayload(payload: IngestFinalizePayload): {
+  reportId: string;
+  projectId: string;
+  r2Keys: string[];
+} {
+  const reportId = payload.reportId.trim();
+  if (!reportId) {
+    throw new ServiceError("VALIDATION_ERROR", "reportId is required.");
   }
-  return heads;
+  const projectId = payload.projectId.trim();
+  if (!projectId) {
+    throw new ServiceError("VALIDATION_ERROR", "projectId is required.");
+  }
+  if (!Array.isArray(payload.r2Keys) || payload.r2Keys.length === 0) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "r2Keys must include at least one key."
+    );
+  }
+  return { projectId, r2Keys: payload.r2Keys, reportId };
 }
 
 export function buildIngestR2Key(
@@ -532,132 +557,6 @@ export function createCaptureIngestService(
       return { reportId, status: "processing" as const };
     },
 
-
-    async processFinalizeJob(payload: IngestFinalizePayload) {
-      const reportId = payload.reportId.trim();
-      if (!reportId) {
-        throw new ServiceError("VALIDATION_ERROR", "reportId is required.");
-      }
-      if (!payload.projectId.trim()) {
-        throw new ServiceError("VALIDATION_ERROR", "projectId is required.");
-      }
-      if (!Array.isArray(payload.r2Keys) || payload.r2Keys.length === 0) {
-        throw new ServiceError(
-          "VALIDATION_ERROR",
-          "r2Keys must include at least one key."
-        );
-      }
-
-      const [report] = await db
-        .select({
-          description: reports.description,
-          id: reports.id,
-          ingestStatus: reports.ingestStatus,
-          organizationId: reports.organizationId,
-          projectId: reports.projectId,
-          title: reports.title,
-        })
-        .from(reports)
-        .where(eq(reports.id, reportId))
-        .limit(1);
-
-      if (!report) {
-        throw new ServiceError("NOT_FOUND", "Report not found.");
-      }
-
-      if (report.projectId !== payload.projectId) {
-        throw new ServiceError(
-          "FORBIDDEN",
-          "Report does not belong to this project."
-        );
-      }
-
-      if (report.ingestStatus === "complete") {
-        return { reportId, status: "complete" as const };
-      }
-
-      const existingBlobs = await db
-        .select({ id: reportBlobs.id })
-        .from(reportBlobs)
-        .where(eq(reportBlobs.reportId, reportId))
-        .limit(1);
-
-      if (existingBlobs.length > 0 && report.ingestStatus === "processing") {
-        await db
-          .update(reports)
-          .set({ ingestStatus: "complete" })
-          .where(eq(reports.id, reportId));
-        return { reportId, status: "complete" as const };
-      }
-
-      const heads = await headValidateKeys(deps.r2, payload.r2Keys);
-      const retention = await deps.usageService.getRetentionDays(
-        report.organizationId
-      );
-      const now = new Date();
-      const nextBlobId = blobIdFactory(deps);
-
-      let metaFields:
-        | ReturnType<typeof deriveSummaryFields>
-        | undefined;
-
-      for (const key of payload.r2Keys) {
-        const descriptor = classifyIngestR2Key(key, report);
-        if (descriptor.type === "meta") {
-          const body = await deps.r2.getObject(key);
-          metaFields = deriveSummaryFields(parseMetaJson(body), report);
-        }
-      }
-
-      const blobRows = payload.r2Keys.map((key) => {
-        const descriptor = classifyIngestR2Key(key, report);
-        const head = heads.get(key);
-        const expiresAt = addRetentionDays(
-          now,
-          retentionDaysForBlobType(descriptor.type, retention)
-        );
-        return {
-          contentType: head?.contentType ?? descriptor.contentType,
-          expiresAt,
-          id: nextBlobId(),
-          r2Key: key,
-          reportId,
-          seq: descriptor.seq,
-          sizeBytes: head?.contentLength ?? 0,
-          type: descriptor.type,
-        };
-      });
-
-      await db.transaction(async (tx) => {
-        await tx.insert(reportBlobs).values(blobRows);
-
-        await tx
-          .update(reports)
-          .set({
-            environment: metaFields?.environment ?? {},
-            ingestStatus: "complete",
-            summary: metaFields?.summary ?? {},
-            summaryText: metaFields?.summaryText ?? report.title,
-          })
-          .where(eq(reports.id, reportId));
-      });
-
-      await deps.usageService.increment({
-        organizationId: report.organizationId,
-      });
-
-      const hooks =
-        (await deps.listRegisteredWebhooks?.(report.organizationId)) ?? [];
-      if (hooks.length > 0 && deps.enqueueWebhookDispatch) {
-        await deps.enqueueWebhookDispatch({
-          organizationId: report.organizationId,
-          reportId,
-        });
-      }
-
-      return { reportId, status: "complete" as const };
-    },
-
     async presignUpload(ctx: CaptureIngestContext, input: PresignUploadInput) {
       const parts = parsePresignParts(input.parts);
       const existing = await findReportByIdempotency(
@@ -733,6 +632,123 @@ export function createCaptureIngestService(
       );
 
       return { reportId, uploads };
+    },
+
+    async processFinalizeJob(payload: IngestFinalizePayload) {
+      const { projectId, reportId, r2Keys } = validateFinalizePayload(payload);
+
+      const [report] = await db
+        .select({
+          description: reports.description,
+          id: reports.id,
+          ingestStatus: reports.ingestStatus,
+          organizationId: reports.organizationId,
+          projectId: reports.projectId,
+          title: reports.title,
+        })
+        .from(reports)
+        .where(eq(reports.id, reportId))
+        .limit(1);
+
+      if (!report) {
+        throw new ServiceError("NOT_FOUND", "Report not found.");
+      }
+
+      if (report.projectId !== projectId) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "Report does not belong to this project."
+        );
+      }
+
+      if (report.ingestStatus === "complete") {
+        return { reportId, status: "complete" as const };
+      }
+
+      const existingBlobs = await db
+        .select({ id: reportBlobs.id })
+        .from(reportBlobs)
+        .where(eq(reportBlobs.reportId, reportId))
+        .limit(1);
+
+      if (existingBlobs.length > 0 && report.ingestStatus === "processing") {
+        await db
+          .update(reports)
+          .set({ ingestStatus: "complete" })
+          .where(eq(reports.id, reportId));
+        return { reportId, status: "complete" as const };
+      }
+
+      const heads = await headValidateKeys(deps.r2, r2Keys);
+      const retention = await deps.usageService.getRetentionDays(
+        report.organizationId
+      );
+      const now = new Date();
+      const nextBlobId = blobIdFactory(deps);
+
+      const metaKey = r2Keys.find(
+        (key) => classifyIngestR2Key(key, report).type === "meta"
+      );
+      const metaFields = metaKey
+        ? deriveSummaryFields(
+            parseMetaJson(await deps.r2.getObject(metaKey)),
+            report
+          )
+        : undefined;
+
+      const blobRows = r2Keys.map((key) => {
+        const descriptor = classifyIngestR2Key(key, report);
+        const head = heads.get(key);
+        const expiresAt = addRetentionDays(
+          now,
+          retentionDaysForBlobType(descriptor.type, retention)
+        );
+        return {
+          contentType: head?.contentType ?? descriptor.contentType,
+          expiresAt,
+          id: nextBlobId(),
+          r2Key: key,
+          reportId,
+          seq: descriptor.seq,
+          sizeBytes: head?.contentLength ?? 0,
+          type: descriptor.type,
+        };
+      });
+
+      await db.transaction(async (tx) => {
+        await tx.insert(reportBlobs).values(blobRows);
+
+        const summaryPatch = metaFields ?? {
+          environment: {},
+          summary: {},
+          summaryText: report.title,
+        };
+
+        await tx
+          .update(reports)
+          .set({
+            environment: summaryPatch.environment,
+            ingestStatus: "complete",
+            summary: summaryPatch.summary,
+            summaryText: summaryPatch.summaryText,
+          })
+          .where(eq(reports.id, reportId));
+      });
+
+      await deps.usageService.increment({
+        organizationId: report.organizationId,
+      });
+
+      const hooks =
+        (await deps.listRegisteredWebhooks?.(report.organizationId)) ?? [];
+      if (hooks.length > 0 && deps.enqueueWebhookDispatch) {
+        await deps.enqueueWebhookDispatch({
+          organizationId: report.organizationId,
+          reportId,
+        });
+      }
+
+      return { reportId, status: "complete" as const };
     },
   };
 }
