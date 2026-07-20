@@ -11,6 +11,9 @@ const EXEMPT_PATHS = new Set([
 ]);
 
 export function isApiOnboardingGateExempt(pathname: string): boolean {
+  if (pathname.startsWith("/api/v1/capture/")) {
+    return true;
+  }
   return EXEMPT_PATHS.has(pathname);
 }
 

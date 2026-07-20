@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { auth } from "../lib/auth";
-import { createRequestId, unauthorizedError } from "../lib/errors";
+import { unauthorizedError } from "../lib/errors";
 
 export interface SessionContext {
   requestId: string;
@@ -13,11 +13,9 @@ export interface SessionContext {
 export const sessionMiddleware = new Elysia({
   name: "session-middleware",
 }).derive({ as: "global" }, async ({ request }) => {
-  const requestId = createRequestId();
   const session = await auth.api.getSession({ headers: request.headers });
 
   return {
-    requestId,
     session: session?.session ?? null,
     user: session?.user ?? null,
   };

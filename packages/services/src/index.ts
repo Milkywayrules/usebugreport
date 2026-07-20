@@ -8,6 +8,16 @@ export {
   requireApiKeyScope,
 } from "./api-key";
 export {
+  buildIngestR2Key,
+  type CaptureIngestContext,
+  type CaptureIngestService,
+  type CaptureIngestServiceDeps,
+  createCaptureIngestService,
+  type IngestPartName,
+  type PresignPartInput,
+  type PresignUploadInput,
+} from "./ingest";
+export {
   createProjectService,
   generatePrefixedId,
   type ProjectService,

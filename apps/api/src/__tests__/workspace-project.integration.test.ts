@@ -9,12 +9,9 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { applyTestEnv, hasDatabaseUrl } from "./test-env";
 
-const databaseUrl = process.env.DATABASE_URL;
-const runIntegration = hasDatabaseUrl() ? describe : describe.skip;
-
 const requestIdPattern = /^req_/;
 
-runIntegration("workspace and project integration", () => {
+describe.skipIf(!hasDatabaseUrl())("workspace and project integration", () => {
   let app: typeof import("../index").app;
   let auth: typeof import("../lib/auth").auth;
   let db: typeof import("../lib/auth").db;
@@ -24,7 +21,7 @@ runIntegration("workspace and project integration", () => {
   let organizationTable: typeof import("@usebugreport/db").schema.organization;
 
   beforeAll(async () => {
-    if (!databaseUrl) {
+    if (!hasDatabaseUrl()) {
       return;
     }
 
