@@ -5,3 +5,14 @@
 3. if havent, make it multi-tenant using better-auth. our user can have multi workspaces (for each client / projects / workspaces / organization). no need for multiple teams (better auth), only multi tenant. each user must have 1 workspace, cannot proceed if not have it.
 
 4. never work on main branch. use `{feat|bugfix|release|hotfix}/*}` branches. open gh PR to main (use actual industry flow).
+
+5. make sure elysiajs setted up for:
+   a. openapi + scalar plugin (technical documentation. you propose to my right-hand for approval, whether it for public, private, or hybrid).
+   b. opentelemetry.
+   c. evlog.
+   d. standardized envelope.
+   e. helmet.
+
+you can set them up as packages if it is complex enough / reusability concern / other aspects (you decide).
+
+propose what you havent implemented from those points to my right-hand for approval.
