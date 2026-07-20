@@ -237,3 +237,28 @@ export async function fetchReports(input: {
   };
   return { data: body.data, page: body.page };
 }
+
+export interface DeletionStatusRow {
+  lastCompletedStep: string | null;
+  status: string;
+  tombstoneId: string | null;
+}
+
+export async function fetchDeletionStatus(organizationId: string) {
+  const response = await apiFetch(
+    `/api/v1/workspaces/${organizationId}/deletion-status`
+  );
+  if (!response.ok) {
+    return {
+      data: {
+        lastCompletedStep: null,
+        status: "none",
+        tombstoneId: null,
+      } satisfies DeletionStatusRow,
+      error: "Unable to load deletion status.",
+    };
+  }
+  const body = (await response.json()) as { data: DeletionStatusRow };
+  return { data: body.data };
+}
+
