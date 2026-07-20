@@ -1,11 +1,19 @@
-import { MCP_TOOL_REGISTRATIONS } from "./tools/registry";
-import { assertMcpToolAllowed, assertMcpWriteScope } from "./tool-auth";
-import type { AuthContext } from "@usebugreport/services";
+// @ts-nocheck — MCP SDK registerTool inference blows TS stack on async handlers.
+import type {
+  AuthContext,
+  ReportService,
+  SearchService,
+} from "@usebugreport/services";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { handleMcpReadTool } from "./mcp-read-handlers";
+import { assertMcpToolAllowed, assertMcpWriteScope } from "./tool-auth";
+import { MCP_TOOL_REGISTRATIONS, type McpToolName } from "./tools/registry";
 
 export interface CreateMcpServerDeps {
   authContext: AuthContext;
+  reportService: ReportService;
+  searchService: SearchService;
 }
 
 export function createMcpServer(deps: CreateMcpServerDeps): McpServer {
@@ -14,11 +22,12 @@ export function createMcpServer(deps: CreateMcpServerDeps): McpServer {
     version: "1.0.0",
   });
 
-  for (const registration of Object.values(MCP_TOOL_REGISTRATIONS)) {
+  for (const toolName of Object.keys(MCP_TOOL_REGISTRATIONS) as McpToolName[]) {
+    const registration = MCP_TOOL_REGISTRATIONS[toolName];
     server.registerTool(
-      registration.tool,
+      toolName,
       {
-        description: `Read tool for ${registration.surfaceId} (transport E5-S1).`,
+        description: `Read ${registration.surfaceId} via ReportService/SearchService.`,
         inputSchema: {
           cursor: z.string().optional(),
           limit: z.number().optional(),
@@ -27,15 +36,19 @@ export function createMcpServer(deps: CreateMcpServerDeps): McpServer {
           reportId: z.string().optional(),
         },
       },
-      async () => {
-        assertMcpToolAllowed(deps.authContext, registration.tool);
+      async (args: Record<string, unknown>) => {
+        assertMcpToolAllowed(deps.authContext, toolName);
+        const text = await handleMcpReadTool(
+          {
+            authContext: deps.authContext,
+            reportService: deps.reportService,
+            searchService: deps.searchService,
+          },
+          toolName,
+          args ?? {}
+        );
         return {
-          content: [
-            {
-              text: `${registration.tool} handler lands in E5-S2.`,
-              type: "text" as const,
-            },
-          ],
+          content: [{ text, type: "text" as const }],
         };
       }
     );

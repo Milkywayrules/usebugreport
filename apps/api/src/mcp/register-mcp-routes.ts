@@ -1,15 +1,21 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { AuthContext } from "@usebugreport/services";
+import type {
+  AuthContext,
+  ReportService,
+  SearchService,
+} from "@usebugreport/services";
 import type { Elysia } from "elysia";
 import { unauthorizedError } from "../lib/errors";
 import { parseBearerToken } from "../middleware/api-key-auth";
 import { createMcpServer } from "./create-mcp-server";
 
 export interface McpRouteDeps {
+  reportService: ReportService;
   resolveAuth: (
     authorization: string | null,
     requestId: string
   ) => Promise<AuthContext | null>;
+  searchService: SearchService;
 }
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -49,7 +55,11 @@ export function registerMcpRoutes(app: unknown, deps: McpRouteDeps): unknown {
     }
 
     const transport = new WebStandardStreamableHTTPServerTransport();
-    const server = createMcpServer({ authContext });
+    const server = createMcpServer({
+      authContext,
+      reportService: deps.reportService,
+      searchService: deps.searchService,
+    });
     await server.connect(transport);
     return transport.handleRequest(context.request);
   });
