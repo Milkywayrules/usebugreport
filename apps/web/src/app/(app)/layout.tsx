@@ -1,5 +1,7 @@
 import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
+import { WorkspaceSwitchHost } from "@/components/app-shell/workspace-switch-host";
 import { Providers } from "@/components/providers";
+import { WorkspaceSwitchProvider } from "@/components/workspace-switch-context";
 import { fetchUserPreferences, fetchWorkspaces } from "@/lib/api-server";
 import { getServerSession } from "@/lib/auth-server";
 
@@ -23,14 +25,22 @@ export default async function AppLayout({
 
   return (
     <Providers>
-      <AppShellLayout
-        activeSlug={activeSlug}
-        pinnedWorkspaceIds={preferences.pinnedWorkspaceIds}
-        user={user}
-        workspaces={workspaces}
-      >
-        {children}
-      </AppShellLayout>
+      <WorkspaceSwitchProvider>
+        <WorkspaceSwitchHost
+          activeSlug={activeSlug}
+          pinnedWorkspaceIds={preferences.pinnedWorkspaceIds}
+          workspaces={workspaces}
+        >
+          <AppShellLayout
+            activeSlug={activeSlug}
+            pinnedWorkspaceIds={preferences.pinnedWorkspaceIds}
+            user={user}
+            workspaces={workspaces}
+          >
+            {children}
+          </AppShellLayout>
+        </WorkspaceSwitchHost>
+      </WorkspaceSwitchProvider>
     </Providers>
   );
 }

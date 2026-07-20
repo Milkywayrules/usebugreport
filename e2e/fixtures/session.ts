@@ -7,6 +7,7 @@ const {
   organization,
   session: sessionTable,
   user: userTable,
+  userPreferences,
 } = schema;
 
 const testEnvDefaults = {
@@ -80,8 +81,18 @@ async function signSessionCookie(token: string): Promise<string> {
   return `${token}.${await makeSignature(token, secret)}`;
 }
 
+export interface SessionOrganization {
+  billingTier?: string;
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export async function createSessionFixture(options?: {
+  activeOrganizationId?: string;
   orgSlug?: string;
+  organizations?: SessionOrganization[];
+  pinnedWorkspaceIds?: string[];
   token?: string;
   userId?: string;
   withOrganization?: boolean;
@@ -114,8 +125,38 @@ export async function createSessionFixture(options?: {
   });
 
   let orgSlug: string | undefined;
+  let activeOrganizationId = options?.activeOrganizationId;
 
-  if (options?.withOrganization) {
+  if (options?.organizations?.length) {
+    for (const org of options.organizations) {
+      await db.insert(organization).values({
+        billingTier: org.billingTier ?? "pro",
+        createdAt: new Date(),
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+      });
+
+      await db.insert(member).values({
+        createdAt: new Date(),
+        id: `member_${org.id}`,
+        organizationId: org.id,
+        role: "owner",
+        userId,
+      });
+    }
+
+    activeOrganizationId ??= options.organizations[0]?.id;
+    orgSlug = options.organizations.find((org) => org.id === activeOrganizationId)?.slug;
+
+    if (options.pinnedWorkspaceIds?.length) {
+      await db.insert(userPreferences).values({
+        pinnedWorkspaceIds: options.pinnedWorkspaceIds,
+        userId,
+      });
+    }
+  } else if (options?.withOrganization) {
+    activeOrganizationId = "org_e2e_gate";
     orgSlug = options.orgSlug ?? "acme";
     await db.insert(organization).values({
       billingTier: "free",
@@ -132,10 +173,12 @@ export async function createSessionFixture(options?: {
       role: "owner",
       userId,
     });
+  }
 
+  if (activeOrganizationId) {
     await db
       .update(sessionTable)
-      .set({ activeOrganizationId: "org_e2e_gate" })
+      .set({ activeOrganizationId })
       .where(eq(sessionTable.id, sessionId));
   }
 

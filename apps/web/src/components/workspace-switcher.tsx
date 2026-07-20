@@ -1,9 +1,14 @@
 "use client";
 
 import { Button, Group, Menu, Text } from "@mantine/core";
+import { useOs } from "@mantine/hooks";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { authClient } from "@/lib/auth-client";
+import { useWorkspaceSwitch } from "@/components/workspace-switch-context";
+import {
+  formatPinSlotHint,
+  type WorkspacePinSlot,
+} from "@/keyboard/shortcuts";
 
 interface WorkspaceRow {
   id: string;
@@ -23,6 +28,19 @@ export function WorkspaceSwitcher({
   workspaces,
 }: WorkspaceSwitcherProps) {
   const router = useRouter();
+  const { switchWorkspace } = useWorkspaceSwitch();
+  const os = useOs();
+  const isMac = os === "macos";
+
+  const pinSlotById = useMemo(() => {
+    const map = new Map<string, WorkspacePinSlot>();
+    pinnedWorkspaceIds.forEach((id, index) => {
+      if (index < 9) {
+        map.set(id, (index + 1) as WorkspacePinSlot);
+      }
+    });
+    return map;
+  }, [pinnedWorkspaceIds]);
 
   const ordered = useMemo(() => {
     const pinned = new Set(pinnedWorkspaceIds);
@@ -36,20 +54,10 @@ export function WorkspaceSwitcher({
   const active = workspaces.find((row) => row.slug === activeSlug);
 
   const handleSwitch = useCallback(
-    async (workspace: WorkspaceRow) => {
-      await (
-        authClient as unknown as {
-          organization: {
-            setActive: (input: { organizationId: string }) => Promise<unknown>;
-          };
-        }
-      ).organization.setActive({
-        organizationId: workspace.id,
-      });
-      router.push(`/w/${workspace.slug}/reports`);
-      router.refresh();
+    (workspace: WorkspaceRow) => {
+      switchWorkspace(workspace).catch(() => undefined);
     },
-    [router]
+    [switchWorkspace]
   );
 
   const openSettings = useCallback(() => {
@@ -62,7 +70,7 @@ export function WorkspaceSwitcher({
         ordered.map((workspace) => [
           workspace.id,
           () => {
-            handleSwitch(workspace).catch(() => undefined);
+            handleSwitch(workspace);
           },
         ])
       ) as Record<string, () => void>,
@@ -86,18 +94,28 @@ export function WorkspaceSwitcher({
       </Menu.Target>
       <Menu.Dropdown>
         <Menu.Label>Workspaces</Menu.Label>
-        {ordered.map((workspace) => (
-          <Menu.Item key={workspace.id} onClick={switchHandlers[workspace.id]}>
-            <Group gap="xs" justify="space-between">
-              <Text size="sm">{workspace.name}</Text>
-              {workspace.slug === activeSlug ? (
-                <Text c="dimmed" size="xs">
-                  active
-                </Text>
-              ) : null}
-            </Group>
-          </Menu.Item>
-        ))}
+        {ordered.map((workspace) => {
+          const slot = pinSlotById.get(workspace.id);
+          return (
+            <Menu.Item key={workspace.id} onClick={switchHandlers[workspace.id]}>
+              <Group gap="xs" justify="space-between" wrap="nowrap">
+                <Text size="sm">{workspace.name}</Text>
+                <Group gap={6} wrap="nowrap">
+                  {slot ? (
+                    <Text c="dimmed" size="xs">
+                      {formatPinSlotHint(slot, isMac)}
+                    </Text>
+                  ) : null}
+                  {workspace.slug === activeSlug ? (
+                    <Text c="dimmed" size="xs">
+                      active
+                    </Text>
+                  ) : null}
+                </Group>
+              </Group>
+            </Menu.Item>
+          );
+        })}
         <Menu.Divider />
         <Menu.Item onClick={openSettings}>Manage workspaces</Menu.Item>
       </Menu.Dropdown>

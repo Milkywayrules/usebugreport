@@ -1,8 +1,9 @@
 "use client";
 
-import { AppShell } from "@mantine/core";
+import { AppShell, LoadingOverlay } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useParams } from "next/navigation";
+import { useWorkspaceSwitch } from "@/components/workspace-switch-context";
 import { AppHeader } from "./app-header";
 import { AppNavbar } from "./app-navbar";
 
@@ -35,6 +36,7 @@ export function AppShellLayout({
   const params = useParams();
   const routeSlug = params?.slug as string | undefined;
   const slug = routeSlug ?? activeSlug ?? "";
+  const { isSwitching } = useWorkspaceSwitch();
 
   return (
     <AppShell
@@ -59,7 +61,15 @@ export function AppShellLayout({
       <AppShell.Navbar p="sm">
         <AppNavbar slug={slug} />
       </AppShell.Navbar>
-      <AppShell.Main>{children}</AppShell.Main>
+      <AppShell.Main pos="relative">
+        <LoadingOverlay
+          data-testid="workspace-switch-loading"
+          overlayProps={{ radius: "sm", blur: 2 }}
+          visible={isSwitching}
+          zIndex={200}
+        />
+        {children}
+      </AppShell.Main>
     </AppShell>
   );
 }
