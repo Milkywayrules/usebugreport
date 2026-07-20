@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: "2026-07-20 23:00"
+# last_updated: "2026-07-20 23:15"
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -92,11 +92,11 @@ development_status:
   6-1-domain-services-and-ad-1-lint-gate: done
   6-2-surface-registry-and-route-validation: done
   6-3-rest-report-endpoints: done
-  6-4-rest-parity-contract-tests-real-http: backlog
+  6-4-rest-parity-contract-tests-real-http: review
   epic-6-retrospective: optional
   epic-7: in-progress  # E7 (launch)
   7-1-linear-oauth-and-integrationservice-config: done
-  7-2-outbox-backed-linear-push-worker: review
+  7-2-outbox-backed-linear-push-worker: done
   7-3-outbox-pending-and-failed-conflict-branches: backlog
   3-6-bulk-linear-push: backlog
   epic-3-retrospective: optional
