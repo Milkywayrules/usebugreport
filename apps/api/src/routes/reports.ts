@@ -8,6 +8,10 @@ import { db } from "../lib/auth";
 import { serviceErrorToHttp } from "../lib/errors";
 import { readJsonBody } from "../lib/request-body";
 import { INTEGRATION_PUBLIC_TAG } from "../lib/route-tags";
+import {
+  type ReportAccessRequestContext,
+  resolveReportReadAccess,
+} from "../middleware/report-access";
 import { resolveAuthContext } from "../middleware/auth-context";
 import { requireSession } from "../middleware/session";
 
@@ -33,6 +37,22 @@ function handleServiceError(error: unknown, requestId: string): Response {
   throw error;
 }
 
+
+function toReportAccessContext(context: unknown): ReportAccessRequestContext {
+  const ctx = context as ReportAccessRequestContext & { requestId: string };
+  return {
+    apiKeyAuth: ctx.apiKeyAuth ?? null,
+    request: ctx.request,
+    requestId: ctx.requestId,
+    session: ctx.session ?? null,
+    user: ctx.user ?? null,
+  };
+}
+
+async function authorizeReportRead(context: unknown) {
+  return resolveReportReadAccess(db, toReportAccessContext(context));
+}
+
 function parseSince(value: string | null): Date | undefined {
   if (!value?.trim()) {
     return;
@@ -55,26 +75,12 @@ export function registerReportRoutes(
     .get(
       "/api/v1/reports",
       async (context) => {
-        const authResult = requireSession(
-          context as unknown as SessionHandlerContext
-        );
-        if (!authResult.ok) {
-          return jsonResponse(authResult.body, authResult.status);
+        const access = await authorizeReportRead(context);
+        if (!access.ok) {
+          return jsonResponse(access.body, access.status);
         }
-
-        const resolved = await resolveAuthContext(db, authResult.value);
-        if ("error" in resolved) {
-          return jsonResponse(
-            {
-              error: {
-                code: "FORBIDDEN",
-                message: "Active workspace required.",
-                requestId: authResult.value.requestId,
-              },
-            },
-            403
-          );
-        }
+        const resolved = access.ctx;
+        const requestId = access.requestId;
 
         const url = new URL(context.request.url);
         const q = url.searchParams.get("q") ?? undefined;
@@ -107,10 +113,10 @@ export function registerReportRoutes(
               createdAt: row.createdAt.toISOString(),
             })),
             page: page.page,
-            requestId: authResult.value.requestId,
+            requestId,
           };
         } catch (error) {
-          return handleServiceError(error, authResult.value.requestId);
+          return handleServiceError(error, requestId);
         }
       },
       {
@@ -121,26 +127,12 @@ export function registerReportRoutes(
     )
 
     .get("/api/v1/reports/:reportId", async (context) => {
-      const authResult = requireSession(
-        context as unknown as SessionHandlerContext
-      );
-      if (!authResult.ok) {
-        return jsonResponse(authResult.body, authResult.status);
+      const access = await authorizeReportRead(context);
+      if (!access.ok) {
+        return jsonResponse(access.body, access.status);
       }
-
-      const resolved = await resolveAuthContext(db, authResult.value);
-      if ("error" in resolved) {
-        return jsonResponse(
-          {
-            error: {
-              code: "FORBIDDEN",
-              message: "Active workspace required.",
-              requestId: authResult.value.requestId,
-            },
-          },
-          403
-        );
-      }
+      const resolved = access.ctx;
+      const requestId = access.requestId;
 
       try {
         const report = await reportService.getById(
@@ -161,33 +153,19 @@ export function registerReportRoutes(
             updatedAt: report.updatedAt.toISOString(),
             workspaceSlug: org?.slug ?? null,
           },
-          requestId: authResult.value.requestId,
+          requestId,
         };
       } catch (error) {
-        return handleServiceError(error, authResult.value.requestId);
+        return handleServiceError(error, requestId);
       }
     })
     .get("/api/v1/reports/:reportId/replay-manifest", async (context) => {
-      const authResult = requireSession(
-        context as unknown as SessionHandlerContext
-      );
-      if (!authResult.ok) {
-        return jsonResponse(authResult.body, authResult.status);
+      const access = await authorizeReportRead(context);
+      if (!access.ok) {
+        return jsonResponse(access.body, access.status);
       }
-
-      const resolved = await resolveAuthContext(db, authResult.value);
-      if ("error" in resolved) {
-        return jsonResponse(
-          {
-            error: {
-              code: "FORBIDDEN",
-              message: "Active workspace required.",
-              requestId: authResult.value.requestId,
-            },
-          },
-          403
-        );
-      }
+      const resolved = access.ctx;
+      const requestId = access.requestId;
 
       try {
         const report = await reportService.getById(
@@ -213,33 +191,19 @@ export function registerReportRoutes(
             replayExpired: expired,
             retentionDaysReplay: org?.retentionDaysReplay ?? 7,
           },
-          requestId: authResult.value.requestId,
+          requestId,
         };
       } catch (error) {
-        return handleServiceError(error, authResult.value.requestId);
+        return handleServiceError(error, requestId);
       }
     })
     .get("/api/v1/reports/:reportId/summary", async (context) => {
-      const authResult = requireSession(
-        context as unknown as SessionHandlerContext
-      );
-      if (!authResult.ok) {
-        return jsonResponse(authResult.body, authResult.status);
+      const access = await authorizeReportRead(context);
+      if (!access.ok) {
+        return jsonResponse(access.body, access.status);
       }
-
-      const resolved = await resolveAuthContext(db, authResult.value);
-      if ("error" in resolved) {
-        return jsonResponse(
-          {
-            error: {
-              code: "FORBIDDEN",
-              message: "Active workspace required.",
-              requestId: authResult.value.requestId,
-            },
-          },
-          403
-        );
-      }
+      const resolved = access.ctx;
+      const requestId = access.requestId;
 
       try {
         const summary = await reportService.getSummary(
@@ -248,34 +212,20 @@ export function registerReportRoutes(
         );
         return {
           data: summary,
-          requestId: authResult.value.requestId,
+          requestId,
         };
       } catch (error) {
-        return handleServiceError(error, authResult.value.requestId);
+        return handleServiceError(error, requestId);
       }
     })
 
     .get("/api/v1/reports/:reportId/console-logs", async (context) => {
-      const authResult = requireSession(
-        context as unknown as SessionHandlerContext
-      );
-      if (!authResult.ok) {
-        return jsonResponse(authResult.body, authResult.status);
+      const access = await authorizeReportRead(context);
+      if (!access.ok) {
+        return jsonResponse(access.body, access.status);
       }
-
-      const resolved = await resolveAuthContext(db, authResult.value);
-      if ("error" in resolved) {
-        return jsonResponse(
-          {
-            error: {
-              code: "FORBIDDEN",
-              message: "Active workspace required.",
-              requestId: authResult.value.requestId,
-            },
-          },
-          403
-        );
-      }
+      const resolved = access.ctx;
+      const requestId = access.requestId;
 
       try {
         const logs = await reportService.getConsoleLogs(
@@ -284,33 +234,19 @@ export function registerReportRoutes(
         );
         return {
           data: logs,
-          requestId: authResult.value.requestId,
+          requestId,
         };
       } catch (error) {
-        return handleServiceError(error, authResult.value.requestId);
+        return handleServiceError(error, requestId);
       }
     })
     .get("/api/v1/reports/:reportId/network-requests", async (context) => {
-      const authResult = requireSession(
-        context as unknown as SessionHandlerContext
-      );
-      if (!authResult.ok) {
-        return jsonResponse(authResult.body, authResult.status);
+      const access = await authorizeReportRead(context);
+      if (!access.ok) {
+        return jsonResponse(access.body, access.status);
       }
-
-      const resolved = await resolveAuthContext(db, authResult.value);
-      if ("error" in resolved) {
-        return jsonResponse(
-          {
-            error: {
-              code: "FORBIDDEN",
-              message: "Active workspace required.",
-              requestId: authResult.value.requestId,
-            },
-          },
-          403
-        );
-      }
+      const resolved = access.ctx;
+      const requestId = access.requestId;
 
       try {
         const requests = await reportService.getNetworkRequests(
@@ -319,10 +255,10 @@ export function registerReportRoutes(
         );
         return {
           data: requests,
-          requestId: authResult.value.requestId,
+          requestId,
         };
       } catch (error) {
-        return handleServiceError(error, authResult.value.requestId);
+        return handleServiceError(error, requestId);
       }
     })
     .patch("/api/v1/reports/:reportId/status", async (context) => {
@@ -387,26 +323,12 @@ export function registerReportRoutes(
     })
 
     .get("/api/v1/reports/search", async (context) => {
-      const authResult = requireSession(
-        context as unknown as SessionHandlerContext
-      );
-      if (!authResult.ok) {
-        return jsonResponse(authResult.body, authResult.status);
+      const access = await authorizeReportRead(context);
+      if (!access.ok) {
+        return jsonResponse(access.body, access.status);
       }
-
-      const resolved = await resolveAuthContext(db, authResult.value);
-      if ("error" in resolved) {
-        return jsonResponse(
-          {
-            error: {
-              code: "FORBIDDEN",
-              message: "Active workspace required.",
-              requestId: authResult.value.requestId,
-            },
-          },
-          403
-        );
-      }
+      const resolved = access.ctx;
+      const requestId = access.requestId;
 
       const url = new URL(context.request.url);
       const query = url.searchParams.get("q") ?? "";
@@ -432,10 +354,10 @@ export function registerReportRoutes(
         return {
           data: page.data,
           page: page.page,
-          requestId: authResult.value.requestId,
+          requestId,
         };
       } catch (error) {
-        return handleServiceError(error, authResult.value.requestId);
+        return handleServiceError(error, requestId);
       }
     });
 }
