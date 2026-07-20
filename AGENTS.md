@@ -18,11 +18,11 @@ dumb / dead-ass simple task (like commit, push, github-related, wording, explore
 - when you to stop? if [AGENTS_STOP_FILE](./AGENTS_STOP_FILE) exist.
 - there are user / human mandatory input / answer? append to [HARNESS-HUMAN-INPUT](./HARNESS-HUMAN-INPUT.md). prefer actionable and checklist item format, if possible.
 
-## Need human / user approval?
+## Need human / user approval? Raise to [right-hand] of user
 
-spawn subagents of: fable 5 medium, gpt 5.6 sol, and composer 2.5 fast for decision maker (use cheaper variant if there is any unavailable model). They are 3 are the hand-right of me (the user).
+spawn subagents of: `cursor-grok-4.5-high`, `claude-4.6-opus-medium`, and `composer-2.5-fast` for decision maker.
 
-verbatim output format for each subagent:
+verbatim output format for [right-hand]:
 
 ```
 **YES/NO/YES_WITH_NOTES/NO_WITH_NOTES**:
@@ -37,10 +37,8 @@ verbatim output format for each subagent:
 
 **Additional from me**:
 
-- a
-- b
-- c
-- etc
+{the format is totally freedom, up to each [right-hand]}
+
 ```
 
 ## Unit test, e2e test, and other test
