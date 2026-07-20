@@ -1,5 +1,10 @@
 # Deferred work
 
+## Deferred from: code review of 1-2-instant-replay-buffer-and-privacy-plugins (2026-07-20)
+
+- Console/network event arrays have no max-count guard (replay has `MAX_REPLAY_EVENT_COUNT`) — add caps if telemetry storms become a concern in E1-S3
+- Response-body 32 KB cap not isolated in unit tests — request path covered; add symmetric test if regressions reported
+
 ## Deferred from: code review of 4-3-workspace-and-project-crud-with-ingest-keys (2026-07-20)
 
 - Missing concurrent workspace-create integration test — advisory lock covered in service unit path; add parallel POST test in follow-up

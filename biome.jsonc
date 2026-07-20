@@ -43,6 +43,24 @@
           }
         }
       }
+    },
+    {
+      "includes": ["packages/capture-core/src/vendor/**"],
+      "linter": { "enabled": false },
+      "formatter": { "enabled": false }
+    },
+    {
+      "includes": ["packages/capture-core/**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "performance": { "useTopLevelRegex": "off" },
+          "style": {
+            "noNonNullAssertion": "off",
+            "useDestructuring": "off"
+          },
+          "suspicious": { "noEmptyBlockStatements": "off" }
+        }
+      }
     }
   ]
 }
