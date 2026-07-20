@@ -14,10 +14,11 @@ implementer only by subagents. chat's agent (main agent) must be an-orchestrator
 
 - the user (King) will append anything you need to follow (update your memory index cache) in [here](HARNESS-ADDITIONAL-INSTRUCTIONS.md).
 - when you to stop? if [AGENTS_STOP_FILE](./AGENTS_STOP_FILE) exist.
+- there are user / human mandatory input / answer? append to [HARNESS-HUMAN-INPUT](./HARNESS-HUMAN-INPUT.md).
 
 ## Need human / user approval?
 
-spawn subagents of fable 5 medium, gpt 5.6 sol, and composer 2.5 fast for decision maker. They are 3 are the hand-right of me (the user).
+spawn subagents of: fable 5 medium, gpt 5.6 sol, and composer 2.5 fast for decision maker (use cheaper variant if there is any unavailable model). They are 3 are the hand-right of me (the user).
 
 verbatim output format for each subagent:
 
@@ -44,6 +45,8 @@ verbatim output format for each subagent:
 
 use e2e test, setup playwright.
 use bun test for unit test.
+use pact js for API contract test.
+use other appropriate test libraries if needed.
 
 ## Personal behavior & coding principles (MUST FOLLOW)
 
