@@ -33,6 +33,7 @@ import { patchReportStatus } from "@/lib/reports/update-status-api";
 import { GLOBAL_SHORTCUTS } from "@/keyboard/shortcuts";
 import { useHotkeys } from "@mantine/hooks";
 import { useReportListHotkeys } from "@/keyboard/use-report-list-hotkeys";
+import { useRegisterSpotlightBridge } from "@/keyboard/spotlight-command-context";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -95,6 +96,23 @@ export function ReportsList({
   }, [project, q, since, status]);
 
   const queryClient = useQueryClient();
+
+  const selectedIds = useMemo(() => [...selected], [selected]);
+
+  useRegisterSpotlightBridge(
+    {
+      canEdit,
+      patchStatus: async (reportId, status) => {
+        await patchReportStatus(reportId, status);
+        await queryClient.invalidateQueries({ queryKey: ["reports"] });
+      },
+      projects,
+      selectedReportIds: selectedIds,
+      workspaceSlug,
+    },
+    [canEdit, projects, queryClient, selectedIds, workspaceSlug]
+  );
+
 
   const reportsQuery = useQuery({
     queryKey: ["reports", organizationId, queryString.toString()],

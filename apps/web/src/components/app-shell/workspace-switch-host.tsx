@@ -2,6 +2,7 @@
 
 import { useWorkspacePinHotkeys } from "@/keyboard/use-workspace-pin-hotkeys";
 import { WorkspaceSpotlight } from "@/components/spotlight-provider";
+import { SpotlightCommandProvider } from "@/keyboard/spotlight-command-context";
 
 interface WorkspaceRow {
   id: string;
@@ -25,9 +26,15 @@ export function WorkspaceSwitchHost({
   useWorkspacePinHotkeys({ activeSlug, pinnedWorkspaceIds, workspaces });
 
   return (
-    <>
-      <WorkspaceSpotlight activeSlug={activeSlug} workspaces={workspaces} />
+    <SpotlightCommandProvider>
+      <WorkspaceSpotlight
+        activeSlug={activeSlug}
+        onOpenShortcuts={() => {
+          window.dispatchEvent(new Event("ubr:open-shortcuts"));
+        }}
+        workspaces={workspaces}
+      />
       {children}
-    </>
+    </SpotlightCommandProvider>
   );
 }
