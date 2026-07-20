@@ -3,6 +3,7 @@
 import { Alert, Box, Loader, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { useReplayViewerHotkeys } from "@/keyboard/use-replay-viewer-hotkeys";
 import rrwebPlayer from "rrweb-player";
 import "rrweb-player/dist/style.css";
 import {
@@ -17,6 +18,16 @@ export function ReplayViewer({ reportId }: { reportId: string }) {
   const manifestQuery = useQuery({
     queryFn: () => fetchReplayManifest(reportId),
     queryKey: ["report", reportId, "replay-manifest"],
+  });
+
+  const replayActive = Boolean(
+    manifestQuery.data && !manifestQuery.data.replayExpired
+  );
+
+  useReplayViewerHotkeys({
+    active: replayActive,
+    containerRef,
+    playerRef,
   });
 
   useEffect(() => {
@@ -51,34 +62,6 @@ export function ReplayViewer({ reportId }: { reportId: string }) {
     };
   }, [manifestQuery.data, reportId]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const player = playerRef.current;
-      if (!player || !containerRef.current?.contains(document.activeElement)) {
-        return;
-      }
-      const replayer = player.getReplayer();
-      if (event.code === "Space") {
-        event.preventDefault();
-        if (replayer.service.state.value === "playing") {
-          replayer.pause();
-        } else {
-          replayer.play();
-        }
-      }
-      if (event.code === "ArrowRight") {
-        event.preventDefault();
-        replayer.play(replayer.getCurrentTime() + 5000);
-      }
-      if (event.code === "ArrowLeft") {
-        event.preventDefault();
-        replayer.play(Math.max(0, replayer.getCurrentTime() - 5000));
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   if (manifestQuery.isLoading) {
     return <Loader aria-label="Loading replay" />;

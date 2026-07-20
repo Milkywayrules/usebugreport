@@ -22,6 +22,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReportListRow } from "@/lib/api-server";
+import { useReportListHotkeys } from "@/keyboard/use-report-list-hotkeys";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -186,57 +187,44 @@ export function ReportsList({
     setFocusedIndex(0);
   }, [queryString.toString()]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select")) {
-        return;
-      }
 
-      if (event.key === "j" || event.key === "ArrowDown") {
-        event.preventDefault();
-        setFocusedIndex((index) => Math.min(index + 1, Math.max(rows.length - 1, 0)));
-        return;
-      }
-      if (event.key === "k" || event.key === "ArrowUp") {
-        event.preventDefault();
-        setFocusedIndex((index) => Math.max(index - 1, 0));
-        return;
-      }
-      if (event.key === "x" && canEdit) {
-        event.preventDefault();
-        const row = rows[focusedIndex];
-        if (!row) return;
-        setSelected((prev) => {
-          const next = new Set(prev);
-          if (next.has(row.id)) next.delete(row.id);
-          else next.add(row.id);
-          return next;
-        });
-        return;
-      }
-      if (event.key === "X" && event.shiftKey && canEdit) {
-        event.preventDefault();
-        setSelected(new Set(rows.map((row) => row.id)));
-        return;
-      }
-      if (event.key === "Enter") {
-        event.preventDefault();
-        const row = rows[focusedIndex];
-        if (row) {
-          router.push(`/w/${workspaceSlug}/reports/${row.id}`);
-        }
-        return;
-      }
-      if (event.key === "/") {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
+  const focusedRow = rows[focusedIndex];
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [canEdit, focusedIndex, router, rows, workspaceSlug]);
+  useReportListHotkeys({
+    canEdit,
+    onFocusNext: () => {
+      setFocusedIndex((index) => Math.min(index + 1, Math.max(rows.length - 1, 0)));
+    },
+    onFocusPrev: () => {
+      setFocusedIndex((index) => Math.max(index - 1, 0));
+    },
+    onFocusSearch: () => {
+      searchRef.current?.focus();
+    },
+    onOpenDetail: () => {
+      if (focusedRow) {
+        router.push(`/w/${workspaceSlug}/reports/${focusedRow.id}`);
+      }
+    },
+    onOpenNewTab: () => {
+      if (focusedRow) {
+        window.open(`/w/${workspaceSlug}/reports/${focusedRow.id}`, "_blank");
+      }
+    },
+    onSelectAllVisible: () => {
+      setSelected(new Set(rows.map((row) => row.id)));
+    },
+    onToggleSelect: () => {
+      if (!focusedRow) return;
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(focusedRow.id)) next.delete(focusedRow.id);
+        else next.add(focusedRow.id);
+        return next;
+      });
+    },
+  });
+
 
   return (
     <Stack gap="md">

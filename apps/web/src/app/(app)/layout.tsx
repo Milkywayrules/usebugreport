@@ -1,6 +1,7 @@
 import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
 import { WorkspaceSwitchHost } from "@/components/app-shell/workspace-switch-host";
 import { Providers } from "@/components/providers";
+import { GlobalKeyboardShortcutsHost } from "@/keyboard/global-keyboard-shortcuts-host";
 import { WorkspaceSwitchProvider } from "@/components/workspace-switch-context";
 import { fetchUserPreferences, fetchWorkspaces } from "@/lib/api-server";
 import { getServerSession } from "@/lib/auth-server";
@@ -39,6 +40,7 @@ export default async function AppLayout({
           >
             {children}
           </AppShellLayout>
+          <GlobalKeyboardShortcutsHost />
         </WorkspaceSwitchHost>
       </WorkspaceSwitchProvider>
     </Providers>
