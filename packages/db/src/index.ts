@@ -10,11 +10,17 @@ import {
   memberRelations,
   organization,
   organizationRelations,
+  reportBlobs,
+  reportBlobsRelations,
+  reports,
+  reportsRelations,
   session,
   sessionRelations,
   user,
   userRelations,
   verification,
+  workspaceUsageMonthly,
+  workspaceUsageMonthlyRelations,
 } from "./schema/index";
 
 export const schema = {
@@ -27,11 +33,17 @@ export const schema = {
   memberRelations,
   organization,
   organizationRelations,
+  reportBlobs,
+  reportBlobsRelations,
+  reports,
+  reportsRelations,
   session,
   sessionRelations,
   user,
   userRelations,
   verification,
+  workspaceUsageMonthly,
+  workspaceUsageMonthlyRelations,
 };
 
 export type DbClient = PostgresJsDatabase<typeof schema>;

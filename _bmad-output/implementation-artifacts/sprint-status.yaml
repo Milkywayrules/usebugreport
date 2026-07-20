@@ -1,5 +1,5 @@
 # generated: 2026-07-20 06:31
-# last_updated: 2026-07-20 07:05
+# last_updated: 2026-07-20 07:25
 # project: usebugreport
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 07:05"
+last_updated: "2026-07-20 07:25"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -54,8 +54,8 @@ development_status:
   1-1-monorepo-scaffold-and-capture-packages: done
   epic-4: in-progress  # E4 (launch)
   4-1-better-auth-github-oauth-and-session: done
-  epic-2: backlog  # E2 (launch)
-  2-1-core-ingest-schema-and-queue-payloads: backlog
+  epic-2: in-progress  # E2 (launch)
+  2-1-core-ingest-schema-and-queue-payloads: done
   4-6-usageservice-tier-limits-at-service-boundary-ad-11: backlog  # UsageService before workspace CRUD (E4-S3)
   4-2-onboarding-gate-middleware: backlog
   4-3-workspace-and-project-crud-with-ingest-keys: backlog
