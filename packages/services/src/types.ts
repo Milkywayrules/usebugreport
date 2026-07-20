@@ -9,6 +9,7 @@ export type ProjectAction =
   | "ingest:submit"
   | "integration:manage"
   | "linear:push"
+  | "report:comment"
   | "report:delete"
   | "project:manage_members"
   | "ingest:rotate"

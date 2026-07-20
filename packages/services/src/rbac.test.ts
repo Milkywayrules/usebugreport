@@ -38,6 +38,7 @@ const MEMBERSHIP_MATRIX: Record<ProjectRole, Record<ProjectAction, boolean>> = {
     "project:manage_members": true,
     "project:read": true,
     "project:update": true,
+    "report:comment": true,
     "report:delete": true,
   },
   developer: {
@@ -49,6 +50,7 @@ const MEMBERSHIP_MATRIX: Record<ProjectRole, Record<ProjectAction, boolean>> = {
     "project:manage_members": false,
     "project:read": true,
     "project:update": false,
+    "report:comment": true,
     "report:delete": false,
   },
   reporter: {
@@ -60,6 +62,7 @@ const MEMBERSHIP_MATRIX: Record<ProjectRole, Record<ProjectAction, boolean>> = {
     "project:manage_members": false,
     "project:read": true,
     "project:update": false,
+    "report:comment": true,
     "report:delete": false,
   },
   viewer: {
@@ -71,6 +74,7 @@ const MEMBERSHIP_MATRIX: Record<ProjectRole, Record<ProjectAction, boolean>> = {
     "project:manage_members": false,
     "project:read": true,
     "project:update": false,
+    "report:comment": false,
     "report:delete": false,
   },
 };

@@ -27,6 +27,7 @@ const ACTION_MIN_ROLE: Record<ProjectAction, ProjectRole> = {
   "project:manage_members": "admin",
   "project:read": "viewer",
   "project:update": "admin",
+  "report:comment": "reporter",
   "report:delete": "admin",
 };
 
