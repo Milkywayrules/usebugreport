@@ -42,7 +42,7 @@
 # - Story order is dependency-ordered launch batch (E1-E9) then fast-follow (E10-E11)
 
 generated: "2026-07-20 06:31"
-last_updated: "2026-07-20 22:30"
+last_updated: "2026-07-20 24:00"
 project: usebugreport
 project_key: NOKEY
 tracking_system: file-system
@@ -88,11 +88,11 @@ development_status:
   3-5-bulk-status-change: done
   3-8-human-web-comments-fr-26-lg-2: done
   3-9-command-palette-cmd-k: done
-  epic-6: in-progress  # E6 (launch)
+  epic-6: done  # E6 (launch) — all stories complete
   6-1-domain-services-and-ad-1-lint-gate: done
   6-2-surface-registry-and-route-validation: done
   6-3-rest-report-endpoints: done
-  6-4-rest-parity-contract-tests-real-http: review
+  6-4-rest-parity-contract-tests-real-http: done
   epic-6-retrospective: optional
   epic-7: in-progress  # E7 (launch)
   7-1-linear-oauth-and-integrationservice-config: done
@@ -102,8 +102,8 @@ development_status:
   epic-3-retrospective: optional
   7-4-linear-push-ux-single-palette-and-errors: backlog
   epic-7-retrospective: optional
-  epic-5: backlog  # E5 (launch)
-  5-1-mcp-streamable-http-transport-and-auth: backlog  # E6 before E5 per readiness note
+  epic-5: in-progress  # E5 (launch)
+  5-1-mcp-streamable-http-transport-and-auth: review
   5-2-mcp-read-tools-from-surface-registry: backlog
   5-3-mcp-parity-contract-tests-streamable-http: backlog
   epic-5-retrospective: optional

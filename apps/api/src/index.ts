@@ -28,7 +28,10 @@ import { serviceErrorToHttp } from "./lib/errors";
 import { renderPrometheusMetrics } from "./lib/metrics";
 import { readJsonBody } from "./lib/request-body";
 import { ROUTE_TAGS } from "./lib/route-tags";
-import { apiKeyAuthMiddleware } from "./middleware/api-key-auth";
+import {
+  apiKeyAuthMiddleware,
+  resolveApiKeyFromRequest,
+} from "./middleware/api-key-auth";
 import { onboardingGateMiddleware } from "./middleware/onboarding-gate";
 import { requireSession, sessionMiddleware } from "./middleware/session";
 import { initApiLogger, loggingPlugin } from "./plugins/logging";
@@ -45,6 +48,7 @@ import { registerReportRoutes } from "./routes/reports";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWebCommentRoutes } from "./routes/web/comments";
 import { registerWorkspaceRoutes } from "./routes/workspaces";
+import { registerMcpRoutes } from "./mcp/register-mcp-routes";
 
 initAuth();
 initApiLogger();
@@ -290,6 +294,11 @@ const baseApp = new Elysia()
     }
   );
 
+const appWithMcp = registerMcpRoutes(baseApp, {
+  resolveAuth: (authorization, requestId) =>
+    resolveApiKeyFromRequest(db, authorization, requestId),
+}) as typeof baseApp;
+
 const appWithRoutes = registerLinearIntegrationRoutes(
   registerWebCommentRoutes(
   registerCaptureRoutes(
@@ -297,7 +306,7 @@ const appWithRoutes = registerLinearIntegrationRoutes(
     registerApiKeyRoutes(
       registerUserPreferenceRoutes(
         registerProjectMemberRoutes(
-          registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+          registerProjectRoutes(registerWorkspaceRoutes(appWithMcp))
         )
       )
     ),
