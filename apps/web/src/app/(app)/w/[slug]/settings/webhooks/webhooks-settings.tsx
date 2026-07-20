@@ -15,7 +15,11 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-const LAUNCH_EVENTS = ["report.created", "report.updated"] as const;
+const WEBHOOK_EVENTS = [
+  "report.created",
+  "report.updated",
+  "report.comment.created",
+] as const;
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 interface WebhookRow {
@@ -83,7 +87,7 @@ export function WebhooksSettings({
 }) {
   const queryClient = useQueryClient();
   const [url, setUrl] = useState("");
-  const [events, setEvents] = useState<string[]>([...LAUNCH_EVENTS]);
+  const [events, setEvents] = useState<string[]>([...WEBHOOK_EVENTS]);
 
   const listQuery = useQuery({
     queryFn: fetchWebhooks,
@@ -124,7 +128,7 @@ export function WebhooksSettings({
         onChange={(event) => setUrl(event.currentTarget.value)}
       />
       <Checkbox.Group label="Events" value={events} onChange={setEvents}>
-        {LAUNCH_EVENTS.map((event) => (
+        {WEBHOOK_EVENTS.map((event) => (
           <Checkbox key={event} label={event} value={event} />
         ))}
       </Checkbox.Group>

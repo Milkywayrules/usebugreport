@@ -12,6 +12,11 @@ import { createMcpServer } from "./create-mcp-server";
 
 export interface McpRouteDeps {
   commentService: CommentService;
+  onCommentCreated?: (input: {
+    commentId: string;
+    organizationId: string;
+    reportId: string;
+  }) => Promise<void>;
   reportService: ReportService;
   resolveAuth: (
     authorization: string | null,
@@ -60,6 +65,7 @@ export function registerMcpRoutes(app: unknown, deps: McpRouteDeps): unknown {
     const server = createMcpServer({
       authContext,
       commentService: deps.commentService,
+      onCommentCreated: deps.onCommentCreated,
       reportService: deps.reportService,
       searchService: deps.searchService,
     });

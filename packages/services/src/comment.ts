@@ -88,7 +88,7 @@ export function createCommentService(
       ctx: AuthContext,
       reportId: string,
       input: CreateCommentInput
-    ): Promise<ReportCommentRecord> {
+    ): Promise<ReportCommentRecord & { isNew: boolean }> {
       const body = normalizeBody(input.body);
       if (!body) {
         throw new ServiceError("VALIDATION_ERROR", "Comment body is required.");
@@ -102,7 +102,7 @@ export function createCommentService(
           dedupeKey
         );
         if (existing) {
-          return existing;
+          return { ...existing, isNew: false };
         }
       }
 
@@ -186,7 +186,7 @@ export function createCommentService(
           throw new Error("Failed to create comment.");
         }
 
-        return row;
+        return { ...row, isNew: true };
       } catch (error) {
         if (dedupeKey) {
           const existing = await findByDedupeKey(
@@ -195,7 +195,7 @@ export function createCommentService(
             dedupeKey
           );
           if (existing) {
-            return existing;
+            return { ...existing, isNew: false };
           }
         }
         throw error;
