@@ -2,7 +2,7 @@ import type { DbClient } from "@usebugreport/db";
 import { member, projectMembers, projects } from "@usebugreport/db";
 import { and, eq } from "drizzle-orm";
 import type { AuthContext, OrgRole, ProjectAction, ProjectRole } from "./types";
-import { ServiceError } from "./types";
+import { requireSessionUserId, ServiceError } from "./types";
 
 export const PROJECT_ROLE_ORDER: ProjectRole[] = [
   "viewer",
@@ -113,13 +113,14 @@ export function createRBACService(db: DbClient) {
         return ctx.projectIds;
       }
 
+      const userId = requireSessionUserId(ctx);
       const rows = await db
         .select({ projectId: projectMembers.projectId })
         .from(projectMembers)
         .innerJoin(projects, eq(projectMembers.projectId, projects.id))
         .where(
           and(
-            eq(projectMembers.userId, ctx.userId),
+            eq(projectMembers.userId, userId),
             eq(projects.organizationId, ctx.organizationId)
           )
         );
@@ -153,7 +154,15 @@ export function createRBACService(db: DbClient) {
     ): Promise<ResolvedProjectRole> {
       await assertProjectInOrg(projectId, ctx.organizationId);
 
-      const membership = await loadMembership(projectId, ctx.userId);
+      if (ctx.type === "api_key") {
+        return {
+          role: ctx.projectIds?.includes(projectId) ? "admin" : null,
+          source: "membership",
+        };
+      }
+
+      const userId = requireSessionUserId(ctx);
+      const membership = await loadMembership(projectId, userId);
       if (membership) {
         return { role: membership.role, source: "membership" };
       }
@@ -165,7 +174,7 @@ export function createRBACService(db: DbClient) {
       const orgMember = await db.query.member.findFirst({
         columns: { id: true },
         where: and(
-          eq(member.userId, ctx.userId),
+          eq(member.userId, userId),
           eq(member.organizationId, ctx.organizationId)
         ),
       });

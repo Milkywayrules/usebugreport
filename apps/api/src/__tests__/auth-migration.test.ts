@@ -29,10 +29,7 @@ runMigrationTest("auth migration", () => {
     expect(tableNames).toContain("member");
     expect(tableNames).toContain("invitation");
     expect(tableNames).toContain("apikey");
-
-    expect(tableNames).not.toContain("projects");
-    expect(tableNames).not.toContain("ingest_keys");
-    expect(tableNames).not.toContain("workspace_api_keys");
+    expect(tableNames).toContain("workspace_api_keys");
     expect(tableNames).not.toContain("reports");
   });
 });

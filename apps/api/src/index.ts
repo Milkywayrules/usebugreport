@@ -12,8 +12,10 @@ import { auth, db, initAuth } from "./lib/auth";
 import { getEnv } from "./lib/env";
 import { serviceErrorToHttp } from "./lib/errors";
 import { readJsonBody } from "./lib/request-body";
+import { apiKeyAuthMiddleware } from "./middleware/api-key-auth";
 import { onboardingGateMiddleware } from "./middleware/onboarding-gate";
 import { requireSession, sessionMiddleware } from "./middleware/session";
+import { registerApiKeyRoutes } from "./routes/api-keys";
 import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
@@ -56,6 +58,7 @@ const baseApp = new Elysia()
     })
   )
   .use(sessionMiddleware)
+  .use(apiKeyAuthMiddleware)
   .use(onboardingGateMiddleware)
   .mount(auth.handler)
   .get("/health", async () => {
@@ -164,9 +167,11 @@ const baseApp = new Elysia()
     }
   });
 
-const appWithRoutes = registerUserPreferenceRoutes(
-  registerProjectMemberRoutes(
-    registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+const appWithRoutes = registerApiKeyRoutes(
+  registerUserPreferenceRoutes(
+    registerProjectMemberRoutes(
+      registerProjectRoutes(registerWorkspaceRoutes(baseApp))
+    )
   )
 ) as typeof baseApp;
 

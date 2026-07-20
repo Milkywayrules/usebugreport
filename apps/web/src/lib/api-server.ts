@@ -117,6 +117,28 @@ export async function fetchWorkspaceMembers(organizationId: string) {
   return body;
 }
 
+export interface ApiKeyRow {
+  createdAt: string;
+  expiresAt: string | null;
+  id: string;
+  keyPrefix: string;
+  lastUsedAt: string | null;
+  name: string;
+  revokedAt: string | null;
+  scopes: string[];
+}
+
+export async function fetchApiKeys(organizationId: string) {
+  const response = await apiFetch(
+    `/api/v1/workspaces/${organizationId}/api-keys`
+  );
+  if (!response.ok) {
+    return { data: [] as ApiKeyRow[] };
+  }
+  const body = (await response.json()) as { data: ApiKeyRow[] };
+  return { data: body.data };
+}
+
 export interface ProjectMemberRow {
   email: string;
   name: string;

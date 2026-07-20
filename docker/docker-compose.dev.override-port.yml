@@ -1,0 +1,7 @@
+# Use when host port 5432 is occupied (e.g. usetagih-postgres).
+# Start: docker compose -f docker/docker-compose.dev.yml -f docker/docker-compose.dev.override-port.yml up postgres -d
+# Connect: postgresql://usebugreport:usebugreport@localhost:55432/usebugreport
+services:
+  postgres:
+    ports: !override
+      - "55432:5432"

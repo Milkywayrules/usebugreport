@@ -1,4 +1,13 @@
 export {
+  type ApiKeyRow,
+  type ApiKeyService,
+  type CreateApiKeyResult,
+  createApiKeyService,
+  generateLiveKeyPlaintext,
+  LIVE_KEY_PREFIX,
+  requireApiKeyScope,
+} from "./api-key";
+export {
   createProjectService,
   generatePrefixedId,
   type ProjectService,
@@ -10,6 +19,7 @@ export {
   type ResolvedProjectRole,
 } from "./rbac";
 export type {
+  ApiKeyScope,
   AuthContext,
   CursorPage,
   IncrementOptions,
@@ -26,7 +36,12 @@ export type {
   TierLimitType,
   UsageContext,
 } from "./types";
-export { ServiceError } from "./types";
+export {
+  API_KEY_SCOPES,
+  FREE_TIER_API_KEY_SCOPES,
+  requireSessionUserId,
+  ServiceError,
+} from "./types";
 export {
   createUsageService,
   type UsageService,

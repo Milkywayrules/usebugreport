@@ -15,14 +15,34 @@ export type ProjectAction =
   | "project:delete"
   | "project:update";
 
+export type ApiKeyScope =
+  | "reports:read"
+  | "reports:write"
+  | "mcp:tools"
+  | "webhooks:manage";
+
+export const API_KEY_SCOPES: ApiKeyScope[] = [
+  "reports:read",
+  "reports:write",
+  "mcp:tools",
+  "webhooks:manage",
+];
+
+/** Free tier: only these scopes may be assigned at create (architecture §6). */
+export const FREE_TIER_API_KEY_SCOPES: ApiKeyScope[] = [
+  "reports:read",
+  "mcp:tools",
+];
+
 export interface AuthContext {
   apiKeyId?: string;
   organizationId: string;
   orgRole?: OrgRole;
   projectIds?: string[];
   requestId?: string;
-  type: "session";
-  userId: string;
+  scopes?: ApiKeyScope[];
+  type: "session" | "api_key";
+  userId?: string;
 }
 
 export type ServiceErrorCode =
@@ -45,6 +65,13 @@ export class ServiceError extends Error {
     this.code = code;
     this.details = details;
   }
+}
+
+export function requireSessionUserId(ctx: AuthContext): string {
+  if (ctx.type !== "session" || !ctx.userId) {
+    throw new ServiceError("FORBIDDEN", "Session required.");
+  }
+  return ctx.userId;
 }
 
 export interface CursorPage<T> {

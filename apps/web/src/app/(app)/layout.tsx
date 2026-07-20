@@ -44,7 +44,10 @@ export default async function AppLayout({
           {workspaces.some(
             (row) => row.role === "owner" || row.role === "admin"
           ) && activeSlug ? (
-            <Link href={`/w/${activeSlug}/settings/members`}>Members</Link>
+            <>
+              <Link href={`/w/${activeSlug}/settings/members`}>Members</Link>
+              <Link href={`/w/${activeSlug}/settings/api-keys`}>API keys</Link>
+            </>
           ) : null}
           <Link href="/settings/account">Account</Link>
         </Group>

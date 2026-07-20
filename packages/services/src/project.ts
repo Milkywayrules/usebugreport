@@ -9,7 +9,7 @@ import {
 import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { createRBACService } from "./rbac";
 import type { AuthContext, CursorPage, ProjectRole } from "./types";
-import { ServiceError } from "./types";
+import { requireSessionUserId, ServiceError } from "./types";
 
 const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
@@ -188,6 +188,7 @@ export function createProjectService(db: DbClient) {
       }
 
       const slug = input.slug?.trim() || slugifyProjectName(trimmedName);
+      const userId = requireSessionUserId(ctx);
       const projectId = generatePrefixedId("prj");
       const ingestKeyId = generatePrefixedId("ing");
       const ingestKeyPlaintext = generateIngestKeyPlaintext();
@@ -215,7 +216,7 @@ export function createProjectService(db: DbClient) {
         await tx.insert(projectMembers).values({
           projectId,
           role: "admin",
-          userId: ctx.userId,
+          userId,
         });
 
         await tx.insert(ingestKeys).values({
