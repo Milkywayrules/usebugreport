@@ -94,8 +94,8 @@ development_status:
   6-3-rest-report-endpoints: review
   6-4-rest-parity-contract-tests-real-http: backlog
   epic-6-retrospective: optional
-  epic-7: backlog  # E7 (launch)
-  7-1-linear-oauth-and-integrationservice-config: backlog
+  epic-7: in-progress  # E7 (launch)
+  7-1-linear-oauth-and-integrationservice-config: review
   7-2-outbox-backed-linear-push-worker: backlog
   7-3-outbox-pending-and-failed-conflict-branches: backlog
   3-6-bulk-linear-push: backlog

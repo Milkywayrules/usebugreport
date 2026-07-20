@@ -9,6 +9,7 @@ import {
 import {
   createCommentService,
   createCaptureIngestService,
+  createIntegrationService,
   createProjectService,
   createReportService,
   createSearchService,
@@ -38,6 +39,7 @@ import { registerApiKeyRoutes } from "./routes/api-keys";
 import { registerCaptureRoutes } from "./routes/capture";
 import { registerProjectMemberRoutes } from "./routes/project-members";
 import { registerProjectRoutes } from "./routes/projects";
+import { registerLinearIntegrationRoutes } from "./routes/integrations/linear";
 import { registerReportRoutes } from "./routes/reports";
 import { registerUserPreferenceRoutes } from "./routes/user-preferences";
 import { registerWebCommentRoutes } from "./routes/web/comments";
@@ -78,6 +80,13 @@ const r2Client = createR2Client({
 });
 const reportService = createReportService(db, { r2: r2Client });
 const commentService = createCommentService(db);
+const integrationService = createIntegrationService(db, {
+  appUrl: env.APP_URL,
+  encryptionKey: env.ENCRYPTION_KEY,
+  linearClientId: env.LINEAR_CLIENT_ID,
+  linearClientSecret: env.LINEAR_CLIENT_SECRET,
+  usageService,
+});
 const searchService = createSearchService(db);
 const ingestQueue = createQueue(
   QUEUE_NAMES.INGEST,
@@ -269,7 +278,8 @@ const baseApp = new Elysia()
     }
   );
 
-const appWithRoutes = registerWebCommentRoutes(
+const appWithRoutes = registerLinearIntegrationRoutes(
+  registerWebCommentRoutes(
   registerCaptureRoutes(
     registerReportRoutes(
     registerApiKeyRoutes(
@@ -287,6 +297,8 @@ const appWithRoutes = registerWebCommentRoutes(
     }
   ),
   { commentService }
+  ),
+  { integrationService }
 ) as typeof baseApp;
 
 const appWithProbes =

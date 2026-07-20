@@ -5,8 +5,13 @@ import {
   type TierLimits,
 } from "@usebugreport/config";
 import type { DbClient } from "@usebugreport/db";
-import { member, organization, workspaceUsageMonthly } from "@usebugreport/db";
-import { and, eq, sql } from "drizzle-orm";
+import {
+  integrations,
+  member,
+  organization,
+  workspaceUsageMonthly,
+} from "@usebugreport/db";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { R2Client } from "@usebugreport/storage";
 import { createRetentionService } from "./retention";
 import { ServiceError } from "./types";
@@ -218,13 +223,22 @@ export function createUsageService(db: DbClient, deps: UsageServiceDeps = {}) {
     return rows[0]?.count ?? 0;
   }
 
-  function countIntegrations(organizationId: string): Promise<number> {
+  async function countIntegrations(organizationId: string): Promise<number> {
     if (deps.countIntegrations) {
       return deps.countIntegrations(organizationId);
     }
 
-    // Integrations table lands in E7-S1; default to zero connected integrations.
-    return Promise.resolve(0);
+    const rows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.organizationId, organizationId),
+          isNull(integrations.revokedAt)
+        )
+      );
+
+    return rows[0]?.count ?? 0;
   }
 
   async function getMonthlyReportCount(
