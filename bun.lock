@@ -124,11 +124,13 @@
     },
     "packages/sdk": {
       "name": "@usebugreport/browser",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@usebugreport/capture-core": "workspace:*",
       },
       "devDependencies": {
+        "@happy-dom/global-registrator": "^20.11.0",
+        "happy-dom": "^20.11.0",
         "typescript": "^5.8.0",
       },
     },
