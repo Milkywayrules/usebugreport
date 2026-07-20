@@ -12,11 +12,19 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "bun test",
+    "test": "bun test --preload ./src/test/preload.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check ."
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.11.0",
+    "happy-dom": "^20.11.0",
     "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "@rrweb/rrweb-plugin-console-record": "^2.1.0",
+    "@rrweb/types": "^2.1.0",
+    "@rrweb/utils": "^2.1.0",
+    "rrweb": "^2.1.0"
   }
 }

@@ -30,27 +30,23 @@ const runMigrationTests = hasDatabaseUrl() ? describe : describe.skip;
 runMigrationTests("workspace api keys migration", () => {
   const databaseUrl = process.env.DATABASE_URL as string;
 
-  test(
-    "applies workspace_api_keys table",
-    async () => {
-      const client = postgres(databaseUrl, { max: 1 });
+  test("applies workspace_api_keys table", async () => {
+    const client = postgres(databaseUrl, { max: 1 });
 
-      try {
-        const { execSync } = await import("node:child_process");
-        execSync("bun run db:migrate", {
-          cwd: new URL("../..", import.meta.url).pathname,
-          env: { ...process.env, DATABASE_URL: databaseUrl },
-          stdio: "pipe",
-        });
+    try {
+      const { execSync } = await import("node:child_process");
+      execSync("bun run db:migrate", {
+        cwd: new URL("../..", import.meta.url).pathname,
+        env: { ...process.env, DATABASE_URL: databaseUrl },
+        stdio: "pipe",
+      });
 
-        const tables = await listPublicTables(client);
-        expect(tables).toContain("workspace_api_keys");
-      } finally {
-        await client.end();
-      }
-    },
-    60_000
-  );
+      const tables = await listPublicTables(client);
+      expect(tables).toContain("workspace_api_keys");
+    } finally {
+      await client.end();
+    }
+  }, 60_000);
 
   test("indexes include org id and active partial index", async () => {
     const client = postgres(databaseUrl, { max: 1 });
