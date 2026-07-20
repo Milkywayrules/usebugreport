@@ -5,7 +5,7 @@ import { createLinearPushHandlers } from "./integration-linear-push";
 
 import { createHmac } from "node:crypto";
 import type { DbClient } from "@usebugreport/db";
-import { integrations, projects } from "@usebugreport/db";
+import { integrations, organization, projects } from "@usebugreport/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { decryptSecret, encryptSecret } from "./crypto/secrets";
 import { generatePrefixedId } from "./project";
@@ -425,7 +425,26 @@ export function createIntegrationService(
         .where(eq(integrations.id, row.id));
     },
 
-    getGitHubAuthorizeUrl(ctx: AuthContext): { state: string; url: string } {
+    getGitHubConnectRedirectUrl(ctx: AuthContext): string {
+      const base = deps.appUrl.replace(/\/$/, "");
+      return `${base}/settings/integrations/github?github=connected`;
+    },
+
+    async resolveGitHubConnectRedirectUrl(ctx: AuthContext): Promise<string> {
+      requireSessionUserId(ctx);
+      const [row] = await db
+        .select({ slug: organization.slug })
+        .from(organization)
+        .where(eq(organization.id, ctx.organizationId))
+        .limit(1);
+      const base = deps.appUrl.replace(/\/$/, "");
+      if (row?.slug) {
+        return `${base}/w/${row.slug}/settings/integrations/github?github=connected`;
+      }
+      return this.getGitHubConnectRedirectUrl(ctx);
+    },
+
+        getGitHubAuthorizeUrl(ctx: AuthContext): { state: string; url: string } {
       requireSessionUserId(ctx);
       const state = encodeState(
         {
